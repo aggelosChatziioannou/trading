@@ -1,0 +1,20 @@
+# Core
+python-dotenv>=1.0.0
+requests>=2.31.0
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Trading
+ccxt>=4.0.0
+python-binance>=1.0.0
+ta-lib>=0.4.0
+
+# Notifications
+python-telegram-bot>=20.0
+
+# Database
+sqlalchemy>=2.0.0
+
+# Testing
+pytest>=7.4.0
+pytest-asyncio>=0.21.0

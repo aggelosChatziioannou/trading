@@ -134,6 +134,14 @@ class TechnicalFeatures:
             df["bb_width"] == df["bb_width"].rolling(20).min()
         ).astype(float)
 
+        # --- Gap Size (overnight gap as percentage) ---
+        prev_close = close.shift(1)
+        df["gap_size"] = np.where(
+            prev_close > 0,
+            ((df["open"] - prev_close) / prev_close) * 100,
+            0.0,
+        )
+
         return df
 
     @staticmethod

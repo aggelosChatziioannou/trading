@@ -18,7 +18,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
-from config.settings import settings
+from config.settings import WATCHLIST, settings
 from data.ingestion.price_feed import PriceFeed
 
 logger = logging.getLogger(__name__)
@@ -33,8 +33,9 @@ class DataScheduler:
     All jobs are timezone-aware and respect market hours where appropriate.
     """
 
-    def __init__(self, price_feed: PriceFeed) -> None:
+    def __init__(self, price_feed: PriceFeed, news_feed=None) -> None:
         self._price_feed = price_feed
+        self._news_feed = news_feed
         self._scheduler = BackgroundScheduler(timezone=ET)
 
     def start(self) -> None:
@@ -56,6 +57,16 @@ class DataScheduler:
             name="Check and fill data gaps",
         )
 
+        # Fetch news every 30 minutes during market hours (9:00-16:30 ET)
+        if self._news_feed is not None:
+            self._scheduler.add_job(
+                self._fetch_news,
+                IntervalTrigger(minutes=30),
+                id="fetch_news",
+                name="Fetch news from all sources",
+                max_instances=1,
+            )
+
         self._scheduler.start()
         logger.info("Data scheduler started with %d jobs", len(self._scheduler.get_jobs()))
 
@@ -74,6 +85,22 @@ class DataScheduler:
                 logger.debug("Aggregated %d candles", count)
         except Exception as e:
             logger.error("Candle aggregation failed: %s", e)
+
+    def _fetch_news(self) -> None:
+        """Fetch news from all sources for all watchlist stocks."""
+        if self._news_feed is None:
+            return
+        try:
+            for ticker in WATCHLIST:
+                # Skip ETFs — no company-specific news
+                if ticker in ("SPY", "QQQ", "IWM", "TLT", "XLF", "XLK", "XLE", "XLV", "XLI"):
+                    continue
+                articles = self._news_feed.fetch_all_sources(ticker)
+                if articles:
+                    self._news_feed.store_articles(articles)
+                    logger.debug("Stored %d articles for %s", len(articles), ticker)
+        except Exception as e:
+            logger.error("News fetch failed: %s", e)
 
     def _check_and_fill_gaps(self) -> None:
         """Identify and fill data gaps using yfinance."""

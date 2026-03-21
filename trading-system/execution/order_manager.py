@@ -83,6 +83,13 @@ class OrderManager:
             "reason": "",
         }
 
+        # Step 0: Market hours enforcement
+        from data.ingestion.price_feed import PriceFeed
+        if not PriceFeed.is_market_open():
+            result["reason"] = "Market closed"
+            self._log_skipped_signal(ticker, signal, result["reason"])
+            return result
+
         # Step 1: Check ensemble confidence
         if ensemble_result["action"] == "hold":
             result["reason"] = "Ensemble says hold"

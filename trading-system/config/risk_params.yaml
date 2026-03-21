@@ -1,0 +1,28 @@
+# Risk Management Parameters
+# These are NON-NEGOTIABLE hard limits.
+# Changing any value requires explicit justification documented here.
+
+portfolio:
+  initial_capital: 10000              # Start small — this is a LEARNING system
+  max_position_pct: 5.0               # Max 5% of portfolio per trade
+  max_open_positions: 5               # Max 5 concurrent positions
+  max_daily_trades: 10                # Prevent overtrading (commission drag even on "free" platforms)
+
+stops:
+  max_daily_loss_pct: -2.0            # If down 2% today → STOP ALL TRADING (prevents tilt)
+  max_weekly_loss_pct: -5.0           # If down 5% this week → reduce position sizes by 50%
+  max_drawdown_pct: -10.0             # If down 10% from peak → OBSERVE ONLY MODE
+  recovery_threshold_pct: -5.0        # Resume trading only when drawdown recovers to -5%
+
+position_sizing:
+  method: "half_kelly"                # Conservative Kelly Criterion (half = ~75% growth, ~50% variance)
+  min_size_pct: 0.5                   # Minimum position: 0.5% of portfolio
+  max_size_pct: 5.0                   # Maximum position: 5% of portfolio
+
+leverage:
+  allowed: false                      # NO LEVERAGE. PERIOD.
+  max_leverage: 1.0                   # 1.0 = cash only
+
+sector_limits:
+  max_same_sector: 2                  # Max 2 positions in same sector
+  max_correlation: 0.7                # Don't hold 2 positions with correlation > 0.7

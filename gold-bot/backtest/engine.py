@@ -96,6 +96,11 @@ def run_backtest(
             "equity": risk_mgr.capital + open_pnl,
         })
 
+        # Feed stopped-out SL levels back to entry model
+        for p in risk_mgr.closed_trades[-5:]:  # Check recent closes
+            if p.sl_hit:
+                model.used_sl_levels.add(round(p.original_sl, 1))
+
         # Check for new entry
         can_trade, reason = risk_mgr.can_trade(bar_time)
         if not can_trade:

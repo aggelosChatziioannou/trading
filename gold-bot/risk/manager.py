@@ -96,6 +96,7 @@ class RiskManager:
             self.trades_today = 0
             self.daily_pnl = 0.0
             self.session_stopped = False
+            self.consecutive_losses = 0  # Reset consecutive losses each day
             self.current_session = ""
 
         # Max trades per day

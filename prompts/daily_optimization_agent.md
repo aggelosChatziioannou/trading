@@ -309,11 +309,12 @@ Reference these facts when evaluating changes:
 
 ## BEFORE YOU START EACH RUN
 
-1. Read `gold-bot/results/optimization_log.md` (if it exists) to see past attempts
-2. Read all strategy files to understand current state
+1. Read `gold-bot/results/optimization_log.md` (if it exists) to see past attempts (github https://github.com/aggelosChatziioannou/trading/tree/claude/trading-system-build-ibw0q/prompts)
+2. Read all strategy files to understand current state 
 3. Run the current version and record baseline metrics
 4. THEN start researching improvements
 5. Never skip the baseline run — the code may have changed since last run
+(Code of project in folder C:\Users\aggel\Desktop\trading\gold-bot)
 
 ## AFTER EACH RUN
 

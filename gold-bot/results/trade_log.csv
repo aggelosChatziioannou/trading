@@ -1,3 +1,5 @@
 Entry Time,Exit Time,Direction,Entry Price,SL Price,TP1 Price,TP2 Price,TP3 Price,Exit Price,R:R Planned,R:R Achieved,Confluences,Session,Confluence Score,P&L ($),P&L (%),Running Equity,HTF Bias,Entry Type,Size (oz),TP1 Hit,TP2 Hit,TP3 Hit,SL Hit
-2026-01-21 14:00:00,2026-03-17 04:00:00,short,4856.95,4858.4,4854.77,4854.05,4835.2,4858.42,15.0,-1.26,htf_bias_aligned; liquidity_sweep; bos; eq,NY,5,-0.56,-0.113,499.44,bearish,EQ,0.31,False,False,False,True
-2026-03-17 11:00:00,2026-03-17 11:05:00,short,5004.5,5006.3,5001.8,5000.9,4998.7,5006.32,3.22,-1.21,htf_bias_aligned; liquidity_sweep; bos; fib_79; fvg,NY,6,-0.65,-0.13,498.78,bearish,FVG,0.3,False,False,False,True
+2025-09-02 11:00:00,2025-09-02 11:10:00,long,3484.53,3483.84,3485.58,3485.92,3489.91,3484.46,7.74,0.82,htf_bias_aligned; liquidity_sweep; bos; fvg,NY,5,0.25,0.049,500.25,bullish,FVG,0.43,True,True,False,True
+2025-09-09 07:25:00,2025-09-09 07:35:00,long,3648.28,3646.91,3650.32,3651.01,3654.71,3648.18,4.71,0.46,htf_bias_aligned; liquidity_sweep; bos; fib_79; fvg,London,6,0.26,0.051,500.5,bullish,FVG,0.41,True,False,False,True
+2025-09-12 07:40:00,2025-09-12 07:45:00,short,3648.41,3648.75,3647.92,3647.75,3646.37,3648.78,6.2,-2.16,htf_bias_aligned; liquidity_sweep; bos; eq,London,5,-0.29,-0.058,500.21,bearish,EQ,0.41,False,False,False,True
+2025-09-12 11:05:00,2025-09-12 11:10:00,short,3644.68,3645.32,3643.7,3643.38,3641.58,3645.33,4.77,-1.55,htf_bias_aligned; liquidity_sweep; fib_79; fvg,NY,5,-0.41,-0.082,499.8,bearish,FVG,0.41,False,False,False,True

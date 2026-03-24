@@ -1,6 +1,6 @@
-"""Position sizing based on risk parameters."""
+"""Position sizing based on risk parameters with scaling rules."""
 from config.settings import (
-    RISK_PER_TRADE, LEVERAGE, LOT_SIZE_OZ, COMMISSION_PER_LOT, SPREAD,
+    INITIAL_RISK_PCT, LEVERAGE, LOT_SIZE_OZ, COMMISSION_PER_LOT, SPREAD,
 )
 
 
@@ -8,12 +8,13 @@ def calculate_position_size(
     capital: float,
     entry_price: float,
     stop_loss: float,
+    risk_pct: float = INITIAL_RISK_PCT,
 ) -> dict:
     """Calculate position size in oz and lots.
 
     Returns dict with: lots, oz, risk_dollars, margin_required, commission.
     """
-    risk_dollars = capital * RISK_PER_TRADE
+    risk_dollars = capital * risk_pct
     risk_per_oz = abs(entry_price - stop_loss) + SPREAD
 
     if risk_per_oz <= 0:
@@ -22,10 +23,8 @@ def calculate_position_size(
     oz = risk_dollars / risk_per_oz
     lots = oz / LOT_SIZE_OZ
 
-    # Check margin: margin = (lots * LOT_SIZE_OZ * entry_price) / LEVERAGE
+    # Check margin
     margin_required = (lots * LOT_SIZE_OZ * entry_price) / LEVERAGE
-
-    # If margin exceeds capital, reduce position
     if margin_required > capital:
         lots = (capital * LEVERAGE) / (LOT_SIZE_OZ * entry_price)
         oz = lots * LOT_SIZE_OZ

@@ -1,12 +1,30 @@
-"""Risk manager: daily limits, position tracking, multi-TP management."""
+"""Risk manager with TJR strict rules.
+
+Rules:
+- Max 1 position at a time
+- Max 2 trades per day
+- Daily loss cap: 2% -> stop trading
+- After any loss: 30 min cool-off
+- After 2 consecutive losses: stop for the session
+- No re-entry at same level after stop-out
+- No revenge trades
+- Scaling rules: after 20 trades with 80%+ adherence, increase 25%
+- After 4R drawdown: reduce 50%, 15-trade rebuild block
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
+import random
 
 from config.settings import (
-    MAX_TRADES_PER_DAY, MAX_DAILY_LOSS, TP1_PCT, TP2_PCT, TP3_PCT,
-    SPREAD, SLIPPAGE, COMMISSION_PER_LOT, LOT_SIZE_OZ,
+    MAX_POSITIONS, MAX_TRADES_PER_DAY, MAX_DAILY_LOSS_PCT,
+    INITIAL_RISK_PCT, MAX_RISK_PCT,
+    TP1_PCT, TP2_PCT, TP3_PCT, TP1_RR,
+    SPREAD, MAX_SLIPPAGE, COMMISSION_PER_LOT, LOT_SIZE_OZ,
+    COOLOFF_MINUTES, MAX_CONSECUTIVE_LOSSES,
+    SCALING_TRADE_THRESHOLD, SCALING_ADHERENCE_PCT,
+    SCALING_INCREASE, DRAWDOWN_REDUCE_R, DRAWDOWN_REDUCE_PCT, REBUILD_TRADES,
 )
 
 
@@ -16,12 +34,17 @@ class Position:
     direction: str          # "long" or "short"
     entry_price: float
     stop_loss: float
+    original_sl: float      # Never-widened SL
     tp1: float
     tp2: float
     tp3: float
     total_oz: float
     session: str
     entry_type: str
+    htf_bias: str
+    confluence_score: int = 0
+    confluences: list[str] = field(default_factory=list)
+    planned_rr: float = 0.0
 
     # State
     remaining_oz: float = 0
@@ -36,6 +59,7 @@ class Position:
 
     def __post_init__(self):
         self.remaining_oz = self.total_oz
+        self.original_sl = self.stop_loss
 
 
 @dataclass
@@ -48,21 +72,58 @@ class RiskManager:
     positions: list[Position] = field(default_factory=list)
     closed_trades: list[Position] = field(default_factory=list)
 
+    # TJR strict rules
+    consecutive_losses: int = 0
+    last_loss_time: datetime | None = None
+    current_risk_pct: float = INITIAL_RISK_PCT
+    total_trade_count: int = 0
+    winning_trades_count: int = 0
+    peak_capital: float = 0.0
+    in_rebuild: bool = False
+    rebuild_count: int = 0
+    session_stopped: bool = False
+    current_session: str = ""
+
     def __post_init__(self):
         self.capital = self.starting_capital
+        self.peak_capital = self.starting_capital
 
     def can_trade(self, dt: datetime) -> tuple[bool, str]:
         """Check if we can open a new trade."""
+        # Reset daily state
         if self.current_date != dt.date():
             self.current_date = dt.date()
             self.trades_today = 0
             self.daily_pnl = 0.0
+            self.session_stopped = False
+            self.current_session = ""
 
+        # Max trades per day
         if self.trades_today >= MAX_TRADES_PER_DAY:
-            return False, "Max trades per day reached"
+            return False, "Max trades per day"
 
-        if self.daily_pnl <= -(self.starting_capital * MAX_DAILY_LOSS):
-            return False, "Max daily loss reached"
+        # Max positions at a time
+        if len(self.positions) >= MAX_POSITIONS:
+            return False, "Max positions open"
+
+        # Daily loss cap
+        if self.daily_pnl <= -(self.starting_capital * MAX_DAILY_LOSS_PCT):
+            return False, "Daily loss cap hit"
+
+        # Session stopped (after 2 consecutive losses in same session)
+        if self.session_stopped:
+            return False, "Session stopped after consecutive losses"
+
+        # Cool-off after loss
+        if self.last_loss_time is not None:
+            cooloff_end = self.last_loss_time + timedelta(minutes=COOLOFF_MINUTES)
+            if dt < cooloff_end:
+                return False, "Cool-off period"
+
+        # Consecutive losses check
+        if self.consecutive_losses >= MAX_CONSECUTIVE_LOSSES:
+            self.session_stopped = True
+            return False, "Max consecutive losses"
 
         return True, "OK"
 
@@ -70,22 +131,23 @@ class RiskManager:
         """Register a new open position."""
         self.positions.append(pos)
         self.trades_today += 1
+        self.total_trade_count += 1
 
     def update_positions(self, bar: dict) -> list[dict]:
         """Check SL/TP for all open positions using bar data.
 
-        bar: dict with keys high, low, close, timestamp.
-        Returns list of fill events.
+        Applies realistic execution with random slippage.
         """
         fills = []
         high = bar["high"]
         low = bar["low"]
+        slippage = random.uniform(0, MAX_SLIPPAGE)
 
         for pos in self.positions:
             if pos.closed:
                 continue
 
-            # Check Stop Loss
+            # Check Stop Loss FIRST (worst case execution)
             sl_hit = False
             if pos.direction == "long" and low <= pos.stop_loss:
                 sl_hit = True
@@ -93,14 +155,17 @@ class RiskManager:
                 sl_hit = True
 
             if sl_hit:
+                fill_price = pos.stop_loss
                 if pos.direction == "long":
-                    pnl = (pos.stop_loss - pos.entry_price - SPREAD - SLIPPAGE) * pos.remaining_oz
+                    fill_price -= slippage  # Worse for longs
+                    pnl = (fill_price - pos.entry_price - SPREAD) * pos.remaining_oz
                 else:
-                    pnl = (pos.entry_price - pos.stop_loss - SPREAD - SLIPPAGE) * pos.remaining_oz
+                    fill_price += slippage  # Worse for shorts
+                    pnl = (pos.entry_price - fill_price - SPREAD) * pos.remaining_oz
                 pos.pnl += pnl
                 pos.sl_hit = True
                 pos.closed = True
-                pos.exit_price = pos.stop_loss
+                pos.exit_price = fill_price
                 pos.exit_time = bar["timestamp"]
                 pos.remaining_oz = 0
                 fills.append({"type": "SL", "pnl": pnl, "position": pos})
@@ -163,14 +228,57 @@ class RiskManager:
                     pos.exit_time = bar["timestamp"]
                     pos.exit_price = bar["close"]
 
-        # Move closed positions
+        # Process closed positions
         newly_closed = [p for p in self.positions if p.closed]
         for p in newly_closed:
             commission = (p.total_oz / LOT_SIZE_OZ) * COMMISSION_PER_LOT
             p.pnl -= commission
             self.daily_pnl += p.pnl
             self.capital += p.pnl
-            self.closed_trades.append(p)
-        self.positions = [p for p in self.positions if not p.closed]
 
+            # Update peak and drawdown tracking
+            if self.capital > self.peak_capital:
+                self.peak_capital = self.capital
+
+            # Consecutive loss tracking
+            if p.pnl < 0:
+                self.consecutive_losses += 1
+                self.last_loss_time = p.exit_time
+                self._check_drawdown_scaling()
+            else:
+                self.consecutive_losses = 0
+                self.winning_trades_count += 1
+                self._check_positive_scaling()
+
+            self.closed_trades.append(p)
+
+        self.positions = [p for p in self.positions if not p.closed]
         return fills
+
+    def _check_drawdown_scaling(self):
+        """After 4R drawdown: reduce risk 50%, enter rebuild block."""
+        if self.peak_capital <= 0:
+            return
+        drawdown_pct = (self.peak_capital - self.capital) / self.peak_capital
+        avg_risk = self.starting_capital * self.current_risk_pct
+        if avg_risk > 0:
+            drawdown_in_r = (self.peak_capital - self.capital) / avg_risk
+            if drawdown_in_r >= DRAWDOWN_REDUCE_R and not self.in_rebuild:
+                self.current_risk_pct *= DRAWDOWN_REDUCE_PCT
+                self.current_risk_pct = max(self.current_risk_pct, 0.001)
+                self.in_rebuild = True
+                self.rebuild_count = 0
+
+    def _check_positive_scaling(self):
+        """After 20 trades with 80%+ win rate: increase risk 25%."""
+        if self.in_rebuild:
+            self.rebuild_count += 1
+            if self.rebuild_count >= REBUILD_TRADES:
+                self.in_rebuild = False
+            return
+
+        if self.total_trade_count >= SCALING_TRADE_THRESHOLD:
+            win_rate = self.winning_trades_count / self.total_trade_count
+            if win_rate >= SCALING_ADHERENCE_PCT:
+                new_risk = self.current_risk_pct * (1 + SCALING_INCREASE)
+                self.current_risk_pct = min(new_risk, MAX_RISK_PCT)

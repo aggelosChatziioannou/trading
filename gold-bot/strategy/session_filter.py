@@ -1,41 +1,56 @@
-"""Session and news filters."""
+"""Session and news filters for TJR strategy.
+
+Sessions (EST):
+  Asia: 8PM-12AM (mark range only, NO trading)
+  London Killzone: 2AM-5AM (trade: manipulation -> reversal)
+  NY Killzone: 7AM-10AM (trade: reversal -> continuation)
+"""
 from __future__ import annotations
 
 from datetime import datetime
 
 import pytz
 
-from config.settings import KILLZONES, TIMEZONE
+from config.settings import KILLZONES, ASIA_SESSION, TIMEZONE
 from config.news_calendar import is_news_blackout
 
 ET = pytz.timezone(TIMEZONE)
 
 
-def is_in_killzone(dt: datetime) -> str | None:
-    """Return killzone name if dt is within a trading killzone, else None."""
+def _to_et(dt: datetime) -> datetime:
     if dt.tzinfo is None:
         dt = pytz.utc.localize(dt)
-    dt_et = dt.astimezone(ET)
+    return dt.astimezone(ET)
 
+
+def is_in_killzone(dt: datetime) -> str | None:
+    """Return killzone name if dt is within a trading killzone, else None."""
+    dt_et = _to_et(dt)
     for kz in KILLZONES:
-        start = dt_et.replace(hour=kz.start_hour, minute=kz.start_minute, second=0, microsecond=0)
-        end = dt_et.replace(hour=kz.end_hour, minute=kz.end_minute, second=0, microsecond=0)
-        if start <= dt_et < end:
+        h, m = dt_et.hour, dt_et.minute
+        start_mins = kz.start_hour * 60 + kz.start_minute
+        end_mins = kz.end_hour * 60 + kz.end_minute
+        curr_mins = h * 60 + m
+        if start_mins <= curr_mins < end_mins:
             return kz.name
     return None
+
+
+def is_in_asia(dt: datetime) -> bool:
+    """Check if dt is within the Asia session (8PM-12AM EST)."""
+    dt_et = _to_et(dt)
+    return dt_et.hour >= ASIA_SESSION.start_hour or dt_et.hour < ASIA_SESSION.end_hour
 
 
 def should_trade(dt: datetime) -> tuple[bool, str]:
     """Check if we should trade at this time.
 
-    Returns (can_trade, reason_or_session_name).
+    Returns (can_trade, session_name_or_reason).
     """
-    if dt.tzinfo is None:
-        dt = pytz.utc.localize(dt)
-    dt_et = dt.astimezone(ET)
+    dt_et = _to_et(dt)
 
     if is_news_blackout(dt_et.date()):
-        return False, "News blackout day"
+        return False, "News blackout"
 
     kz = is_in_killzone(dt)
     if kz is None:

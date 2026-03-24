@@ -23,8 +23,8 @@ class ConfluenceResult:
     has_continuation: bool = False
 
     REVERSAL_TYPES = {"liquidity_sweep", "pdh_pdl_sweep"}
-    CONFIRMATION_TYPES = {"bos", "choch", "ifvg", "smt", "fib_79"}
-    CONTINUATION_TYPES = {"fvg", "ob", "bb", "eq"}
+    CONFIRMATION_TYPES = {"bos", "choch", "ifvg", "smt", "fib_79", "displacement"}
+    CONTINUATION_TYPES = {"fvg", "ob", "ob_fvg", "bb", "eq"}
 
     def add(self, confluence_type: str):
         """Add a confluence and update score."""

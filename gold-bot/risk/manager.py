@@ -20,8 +20,8 @@ import random
 from config.settings import (
     MAX_POSITIONS, MAX_TRADES_PER_DAY, MAX_DAILY_LOSS_PCT,
     INITIAL_RISK_PCT, MAX_RISK_PCT,
-    TP1_PCT, TP2_PCT, TP3_PCT, TP1_RR,
-    SPREAD, MAX_SLIPPAGE, COMMISSION_PER_LOT, LOT_SIZE_OZ,
+    TP1_PCT, TP2_PCT,
+    TOTAL_COST_PER_TRADE, MAX_SLIPPAGE, LOT_SIZE_OZ,
     COOLOFF_MINUTES, MAX_CONSECUTIVE_LOSSES,
     SCALING_TRADE_THRESHOLD, SCALING_ADHERENCE_PCT,
     SCALING_INCREASE, DRAWDOWN_REDUCE_R, DRAWDOWN_REDUCE_PCT, REBUILD_TRADES,
@@ -158,11 +158,11 @@ class RiskManager:
             if sl_hit:
                 fill_price = pos.stop_loss
                 if pos.direction == "long":
-                    fill_price -= slippage  # Worse for longs
-                    pnl = (fill_price - pos.entry_price - SPREAD) * pos.remaining_oz
+                    fill_price -= slippage
+                    pnl = (fill_price - pos.entry_price) * pos.remaining_oz
                 else:
-                    fill_price += slippage  # Worse for shorts
-                    pnl = (pos.entry_price - fill_price - SPREAD) * pos.remaining_oz
+                    fill_price += slippage
+                    pnl = (pos.entry_price - fill_price) * pos.remaining_oz
                 pos.pnl += pnl
                 pos.sl_hit = True
                 pos.closed = True
@@ -172,55 +172,39 @@ class RiskManager:
                 fills.append({"type": "SL", "pnl": pnl, "position": pos})
                 continue
 
-            # Check TP1
+            # Check TP1 (Change 7: close 50%, move SL to breakeven)
             if not pos.tp1_hit:
                 tp1_hit = ((pos.direction == "long" and high >= pos.tp1) or
                            (pos.direction == "short" and low <= pos.tp1))
                 if tp1_hit:
                     close_oz = pos.total_oz * TP1_PCT
                     if pos.direction == "long":
-                        pnl = (pos.tp1 - pos.entry_price - SPREAD) * close_oz
+                        pnl = (pos.tp1 - pos.entry_price) * close_oz
                     else:
-                        pnl = (pos.entry_price - pos.tp1 - SPREAD) * close_oz
+                        pnl = (pos.entry_price - pos.tp1) * close_oz
                     pos.pnl += pnl
                     pos.tp1_hit = True
                     pos.remaining_oz -= close_oz
-                    # Move SL to breakeven
-                    pos.stop_loss = pos.entry_price
+                    pos.stop_loss = pos.entry_price  # Move SL to breakeven
                     fills.append({"type": "TP1", "pnl": pnl, "position": pos})
 
-            # Check TP2
+            # Check TP2 (close remaining 50%)
             if pos.tp1_hit and not pos.tp2_hit:
                 tp2_hit = ((pos.direction == "long" and high >= pos.tp2) or
                            (pos.direction == "short" and low <= pos.tp2))
                 if tp2_hit:
-                    close_oz = pos.total_oz * TP2_PCT
-                    if pos.direction == "long":
-                        pnl = (pos.tp2 - pos.entry_price - SPREAD) * close_oz
-                    else:
-                        pnl = (pos.entry_price - pos.tp2 - SPREAD) * close_oz
-                    pos.pnl += pnl
-                    pos.tp2_hit = True
-                    pos.remaining_oz -= close_oz
-                    fills.append({"type": "TP2", "pnl": pnl, "position": pos})
-
-            # Check TP3
-            if pos.tp2_hit and not pos.tp3_hit:
-                tp3_hit = ((pos.direction == "long" and high >= pos.tp3) or
-                           (pos.direction == "short" and low <= pos.tp3))
-                if tp3_hit:
                     close_oz = pos.remaining_oz
                     if pos.direction == "long":
-                        pnl = (pos.tp3 - pos.entry_price - SPREAD) * close_oz
+                        pnl = (pos.tp2 - pos.entry_price) * close_oz
                     else:
-                        pnl = (pos.entry_price - pos.tp3 - SPREAD) * close_oz
+                        pnl = (pos.entry_price - pos.tp2) * close_oz
                     pos.pnl += pnl
-                    pos.tp3_hit = True
+                    pos.tp2_hit = True
                     pos.remaining_oz = 0
                     pos.closed = True
-                    pos.exit_price = pos.tp3
+                    pos.exit_price = pos.tp2
                     pos.exit_time = bar["timestamp"]
-                    fills.append({"type": "TP3", "pnl": pnl, "position": pos})
+                    fills.append({"type": "TP2", "pnl": pnl, "position": pos})
 
             # Close if remaining is negligible
             if pos.remaining_oz <= 0.001 and not pos.closed:
@@ -232,8 +216,9 @@ class RiskManager:
         # Process closed positions
         newly_closed = [p for p in self.positions if p.closed]
         for p in newly_closed:
-            commission = (p.total_oz / LOT_SIZE_OZ) * COMMISSION_PER_LOT
-            p.pnl -= commission
+            # Change 10: total cost per trade = $0.50 round trip per oz
+            cost = TOTAL_COST_PER_TRADE * p.total_oz
+            p.pnl -= cost
             self.daily_pnl += p.pnl
             self.capital += p.pnl
 

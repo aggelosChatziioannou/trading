@@ -124,13 +124,19 @@ def compute_metrics(result: BacktestResult) -> dict:
     tp2_hits = sum(1 for t in trades if t.tp2_hit)
     tp3_hits = sum(1 for t in trades if t.tp3_hit)
 
-    # 16. Session breakdown
+    # 16. Session breakdown (handle NY_AM, NY_PM, London)
     london = [t for t in trades if t.session == "London"]
-    ny = [t for t in trades if t.session == "NY"]
+    ny_am = [t for t in trades if t.session == "NY_AM"]
+    ny_pm = [t for t in trades if t.session == "NY_PM"]
+    ny = ny_am + ny_pm  # Combined NY
     london_pnl = sum(t.pnl for t in london)
     ny_pnl = sum(t.pnl for t in ny)
     london_wr = len([t for t in london if t.pnl > 0]) / len(london) if london else 0
     ny_wr = len([t for t in ny if t.pnl > 0]) / len(ny) if ny else 0
+    ny_am_pnl = sum(t.pnl for t in ny_am)
+    ny_pm_pnl = sum(t.pnl for t in ny_pm)
+    ny_am_wr = len([t for t in ny_am if t.pnl > 0]) / len(ny_am) if ny_am else 0
+    ny_pm_wr = len([t for t in ny_pm if t.pnl > 0]) / len(ny_pm) if ny_pm else 0
 
     # 17. Confluence score vs win rate
     score_wr = {}
@@ -225,6 +231,12 @@ def compute_metrics(result: BacktestResult) -> dict:
         "ny_trades": len(ny),
         "ny_pnl": round(ny_pnl, 2),
         "ny_win_rate": round(ny_wr * 100, 1),
+        "ny_am_trades": len(ny_am),
+        "ny_am_pnl": round(ny_am_pnl, 2),
+        "ny_am_win_rate": round(ny_am_wr * 100, 1),
+        "ny_pm_trades": len(ny_pm),
+        "ny_pm_pnl": round(ny_pm_pnl, 2),
+        "ny_pm_win_rate": round(ny_pm_wr * 100, 1),
         "confluence_vs_winrate": score_wr,
         "monthly_pnl": monthly_pnl,
         "day_of_week": dow_pnl,

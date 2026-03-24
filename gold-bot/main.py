@@ -96,6 +96,13 @@ def main():
         result, data=report_data, capital=args.capital, output_dir=args.output,
     )
 
+    # ── Optimization Report ──────────────────────────────────────────
+    if result.trades:
+        from backtest.optimization_report import generate_optimization_report
+        generate_optimization_report(
+            result, metrics, data.gold_5m, output_dir=args.output,
+        )
+
     elapsed = time.time() - start_time
     print(f"\nTotal runtime: {elapsed:.1f}s")
 

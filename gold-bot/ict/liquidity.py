@@ -160,25 +160,50 @@ def find_equal_levels(
     return levels
 
 
-def check_liquidity_sweep(level: LiquidityLevel, bar: pd.Series) -> bool:
-    """Check if a bar sweeps a liquidity level (wick beyond, close back inside)."""
+def check_liquidity_sweep(
+    level: LiquidityLevel, bar: pd.Series, atr: float = 0.0,
+) -> bool:
+    """Check if a bar sweeps a liquidity level (wick beyond, close back inside).
+
+    Change 4: ATR-calibrated sweep detection.
+    Theory: Gold sweeps overshoot $0.50-$2.00. With ATR, we require
+    minimum 0.1x ATR overshoot and max 2.0x ATR (beyond = breakout).
+    """
     if level.swept:
         return False
 
+    from config.settings import SWEEP_MIN_OVERSHOOT_ATR, SWEEP_MAX_OVERSHOOT_ATR
+    min_os = SWEEP_MIN_OVERSHOOT_ATR * atr if atr > 0 else 0.0
+    max_os = SWEEP_MAX_OVERSHOOT_ATR * atr if atr > 0 else float("inf")
+
     if level.type in ("session_high", "pdh", "swing_high", "equal_highs"):
-        return bar["high"] > level.price and bar["close"] < level.price
+        overshoot = bar["high"] - level.price
+        return (overshoot >= min_os and overshoot <= max_os
+                and bar["close"] < level.price)
     elif level.type in ("session_low", "pdl", "swing_low", "equal_lows"):
-        return bar["low"] < level.price and bar["close"] > level.price
+        overshoot = level.price - bar["low"]
+        return (overshoot >= min_os and overshoot <= max_os
+                and bar["close"] > level.price)
     return False
 
 
-def check_asia_sweep(asia: AsiaRange, bar: pd.Series) -> str | None:
+def check_asia_sweep(
+    asia: AsiaRange, bar: pd.Series, atr: float = 0.0,
+) -> str | None:
     """Check if a bar sweeps the Asia range high or low.
 
     Returns 'high' or 'low' if swept, None otherwise.
     """
-    if not asia.high_swept and bar["high"] > asia.high and bar["close"] < asia.high:
-        return "high"
-    if not asia.low_swept and bar["low"] < asia.low and bar["close"] > asia.low:
-        return "low"
+    from config.settings import SWEEP_MIN_OVERSHOOT_ATR, SWEEP_MAX_OVERSHOOT_ATR
+    min_os = SWEEP_MIN_OVERSHOOT_ATR * atr if atr > 0 else 0.0
+    max_os = SWEEP_MAX_OVERSHOOT_ATR * atr if atr > 0 else float("inf")
+
+    if not asia.high_swept:
+        overshoot = bar["high"] - asia.high
+        if min_os <= overshoot <= max_os and bar["close"] < asia.high:
+            return "high"
+    if not asia.low_swept:
+        overshoot = asia.low - bar["low"]
+        if min_os <= overshoot <= max_os and bar["close"] > asia.low:
+            return "low"
     return None

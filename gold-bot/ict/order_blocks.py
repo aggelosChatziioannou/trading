@@ -12,7 +12,7 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 
-from config.settings import OB_VOLUME_MULTIPLIER, OB_RANGE_ATR_RATIO, OB_IMPULSE_MIN_MOVE
+from config.settings import OB_VOLUME_MULTIPLIER, OB_RANGE_ATR_RATIO, OB_IMPULSE_MIN_MOVE, OB_IMPULSE_ATR_RATIO
 
 
 @dataclass
@@ -31,6 +31,7 @@ def detect_order_blocks(
     impulse_min: float = OB_IMPULSE_MIN_MOVE,
     vol_multiplier: float = OB_VOLUME_MULTIPLIER,
     range_atr_ratio: float = OB_RANGE_ATR_RATIO,
+    atr: float = 0.0,
 ) -> list[OB]:
     """Detect Order Blocks with volume and range filters.
 
@@ -75,8 +76,11 @@ def detect_order_blocks(
 
         next_move = closes[i + 1] - closes[i]
 
+        # Change 9: ATR-relative impulse threshold
+        min_impulse = max(impulse_min, OB_IMPULSE_ATR_RATIO * atr) if atr > 0 else impulse_min
+
         # Bullish OB: bearish candle followed by bullish impulse
-        if is_bearish and next_move > impulse_min:
+        if is_bearish and next_move > min_impulse:
             obs.append(OB(
                 timestamp=df.index[i], direction="bullish",
                 zone_high=float(max(opens[i], closes[i])),
@@ -85,7 +89,7 @@ def detect_order_blocks(
             ))
 
         # Bearish OB: bullish candle followed by bearish impulse
-        elif is_bullish and next_move < -impulse_min:
+        elif is_bullish and next_move < -min_impulse:
             obs.append(OB(
                 timestamp=df.index[i], direction="bearish",
                 zone_high=float(max(opens[i], closes[i])),

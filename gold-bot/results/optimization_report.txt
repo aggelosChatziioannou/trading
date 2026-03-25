@@ -5,114 +5,113 @@ Data: XAUUSD 5-min, 2025-09-01 00:00:00 to 2026-02-27 21:55:00
 ======================================================================
 
 1. EXECUTIVE SUMMARY
-   Total trades: 142
-   Net P&L: $31.92
+   Total trades: 129
+   Net P&L: $96.52
    Verdict: PROFITABLE
-   Return: 6.4% over 6 months
+   Return: 9.7% over 6 months
 
 2. CORE METRICS
    +---------------------+--------------+-----------------+
    | Metric              | Value        | Assessment      |
    +---------------------+--------------+-----------------+
-   | Total Trades        |          142 | OK              |
-   | Win Rate            |        43.7% | Target: 40-55%  |
-   | Profit Factor       |         1.38 | OK              |
-   | Sharpe Ratio        |         1.14 | GOOD            |
-   | Sortino Ratio       |         0.38 | Target: >0.70   |
-   | Max Drawdown $      |      $-11.30 |                 |
-   | Max Drawdown %      |        -2.2% | GOOD            |
-   | Avg Win             |        $1.86 |                 |
-   | Avg Loss            |       $-1.04 |                 |
-   | Avg R:R             |         0.21 | Target: >1.5:1  |
-   | Largest Win         |        $5.82 |                 |
-   | Largest Loss        |       $-2.65 |                 |
-   | Avg Duration        |      138 min |                 |
-   | Avg Bars            |         27.6 |                 |
-   | Trades/Week         |          5.6 | Target: 3-8     |
-   | Expectancy/Trade    |        $0.22 |                 |
-   | Total Costs         |       $10.31 |                 |
+   | Total Trades        |          129 | OK              |
+   | Win Rate            |        47.3% | Target: 40-55%  |
+   | Profit Factor       |         1.69 | GOOD            |
+   | Sharpe Ratio        |         1.87 | GOOD            |
+   | Sortino Ratio       |         0.51 | Target: >0.70   |
+   | Max Drawdown $      |      $-22.71 |                 |
+   | Max Drawdown %      |        -2.1% | GOOD            |
+   | Avg Win             |        $3.87 |                 |
+   | Avg Loss            |       $-2.06 |                 |
+   | Avg R:R             |         0.33 | Target: >1.5:1  |
+   | Largest Win         |       $11.22 |                 |
+   | Largest Loss        |       $-5.39 |                 |
+   | Avg Duration        |       95 min |                 |
+   | Avg Bars            |         19.0 |                 |
+   | Trades/Week         |          5.1 | Target: 3-8     |
+   | Expectancy/Trade    |        $0.75 |                 |
+   | Total Costs         |       $19.27 |                 |
    +---------------------+--------------+-----------------+
 
 3. WIN RATE BY SETUP QUALITY (Confluence Score)
-   Score 4: 42 trades, 33.3% WR, $-0.13 avg P&L
-   Score 5: 67 trades, 49.3% WR, $0.47 avg P&L
-   Score 6: 29 trades, 41.4% WR, $0.15 avg P&L
-   Score 7: 4 trades, 75.0% WR, $0.45 avg P&L
+   Score 5: 93 trades, 44.1% WR, $0.57 avg P&L
+   Score 6: 32 trades, 53.1% WR, $1.17 avg P&L
+   Score 7: 4 trades, 75.0% WR, $1.60 avg P&L
 
 4. ENTRY TYPE ANALYSIS
-   FVG: 110 trades, 48.2% WR, avg R=1.47
-   EQ: 32 trades, 28.1% WR, avg R=1.25
+   FVG: 98 trades, 50.0% WR, avg R=1.52
+   EQ: 31 trades, 38.7% WR, avg R=1.29
 
 5. SESSION ANALYSIS
-   London:    56 trades, 41.1% WR, $6.42 P&L
-   NY AM:     58 trades, 41.4% WR, $8.99 P&L
-   NY PM:     28 trades, 53.6% WR, $16.52 P&L
-   Silver Bullet: 45 trades, 42.2% WR, $8.89 P&L
+   London:    48 trades, 45.8% WR, $28.95 P&L
+   NY AM:     51 trades, 47.1% WR, $35.79 P&L
+   NY PM:     30 trades, 50.0% WR, $31.77 P&L
+   Silver Bullet: 59 trades, 40.7% WR, $24.45 P&L
 
 6. DIRECTION ANALYSIS
-   Long:  89 trades, 41.6% WR, $21.11 P&L
-   Short: 53 trades, 47.2% WR, $10.81 P&L
+   Long:  83 trades, 48.2% WR, $66.70 P&L
+   Short: 46 trades, 45.7% WR, $29.81 P&L
 
 7. EXIT ANALYSIS
-   TP1 hit (2R):     62 trades (43.7%)
-   TP2 hit (3R):     39 trades (27.5%)
-   SL hit:           103 trades (72.5%)
-   Breakeven exits:  23 trades (16.2%)
+   TP1 hit (2R):     61 trades (47.3%)
+   TP2 hit (3R):     22 trades (17.1%)
+   SL hit:           107 trades (82.9%)
+   Breakeven exits:  39 trades (30.2%)
 
 8. RISK ANALYSIS
-   Max consecutive wins:  8
-   Max consecutive losses: 11
-   Max DD duration:       136.1 days
-   Recovery factor:       2.82
-   Calmar ratio:          6.22
+   Max consecutive wins:  9
+   Max consecutive losses: 5
+   Max DD duration:       124.2 days
+   Recovery factor:       4.25
+   Calmar ratio:          9.73
 
 9. MONTHLY BREAKDOWN
    +----------+--------+--------+--------+
    | Month    | Trades | WR     | P&L    |
    +----------+--------+--------+--------+
-   | 2025-09  |     18 |  61.1% | $ 22.79 |
-   | 2025-10  |     25 |  36.0% | $ -5.77 |
-   | 2025-11  |     21 |  47.6% | $  9.45 |
-   | 2025-12  |     27 |  40.7% | $  2.15 |
-   | 2026-01  |     23 |  30.4% | $ -2.01 |
-   | 2026-02  |     28 |  50.0% | $  5.31 |
+   | 2025-09  |     18 |  72.2% | $ 69.85 |
+   | 2025-10  |     22 |  40.9% | $ -5.13 |
+   | 2025-11  |     19 |  47.4% | $ 13.88 |
+   | 2025-12  |     23 |  43.5% | $  5.52 |
+   | 2026-01  |     21 |  38.1% | $  2.72 |
+   | 2026-02  |     26 |  46.2% | $  9.68 |
    +----------+--------+--------+--------+
 
 10. ATR STATISTICS
     Average ATR(14) on 5-min: $5.68
     Min ATR: $0.79 | Max ATR: $83.95
-    Average SL used: $10.59
-    Average TP1 distance: $21.19
-    Average TP2 distance: $31.78
+    Average SL used: $11.62
+    Average TP1 distance: $23.24
+    Average TP2 distance: $34.86
 
 11. TRADE LOG (first 10 and last 10)
     Entry Time          | Dir   | Sess   | Type   | Conf | Entry $  | SL $     | TP1 $    | Exit $   | Exit   | P&L $  | R
     ------------------------------------------------------------------------------------------------------------------------
     ... (showing first 10)
-    2025-09-02 07:50:00 |  long | London |    FVG |    5 |  3487.73 |  3482.65 |  3497.88 |  3482.65 |     SL |  -2.40 | -1.1
-    2025-09-12 07:40:00 | short | London |     EQ |    6 |  3648.41 |  3651.52 |  3642.21 |  3639.11 |    TP2 |   2.97 | 2.34
-    2025-09-12 12:30:00 | short |  NY_AM |    FVG |    5 |  3644.34 |  3648.05 |  3636.90 |  3648.15 |     SL |  -1.77 | -1.16
-    2025-09-12 17:30:00 | short |  NY_PM |    FVG |    4 |  3645.54 |  3648.54 |  3639.54 |  3648.58 |     SL |  -1.45 | -1.18
-    2025-09-15 06:15:00 | short | London |     EQ |    5 |  3642.28 |  3645.28 |  3636.28 |  3642.38 | TP1+SL |   1.01 | 0.82
-    2025-09-15 07:40:00 | short | London |    FVG |    7 |  3637.40 |  3640.83 |  3630.54 |  3640.87 |     SL |  -1.63 | -1.16
-    2025-09-18 06:20:00 |  long | London |    FVG |    4 |  3656.10 |  3650.40 |  3667.48 |  3650.37 |     SL |  -2.49 | -1.09
-    2025-09-18 07:15:00 |  long | London |    FVG |    5 |  3643.05 |  3636.84 |  3655.47 |  3661.68 |    TP2 |   5.56 | 2.42
-    2025-09-18 13:00:00 |  long |  NY_AM |    FVG |    5 |  3669.78 |  3664.62 |  3680.10 |  3664.52 |     SL |  -2.36 | -1.12
-    2025-09-19 13:10:00 |  long |  NY_AM |     EQ |    6 |  3652.78 |  3647.84 |  3662.67 |  3667.61 |    TP2 |   4.86 | 2.4
+    2025-09-02 07:50:00 |  long | London |    FVG |    5 |  3487.73 |  3482.65 |  3497.88 |  3482.56 |     SL |  -4.88 | -1.12
+    2025-09-12 07:40:00 | short | London |     EQ |    6 |  3648.41 |  3651.52 |  3642.21 |  3642.95 | TP1+SL |   4.38 | 1.72
+    2025-09-12 12:30:00 | short |  NY_AM |    FVG |    5 |  3644.34 |  3648.05 |  3636.90 |  3648.06 |     SL |  -3.46 | -1.14
+    2025-09-15 06:15:00 | short | London |     EQ |    5 |  3642.28 |  3645.28 |  3636.28 |  3637.02 | TP1+SL |   4.21 | 1.71
+    2025-09-15 07:05:00 | short | London |    FVG |    7 |  3637.40 |  3640.59 |  3631.02 |  3640.64 |     SL |  -3.07 | -1.17
+    2025-09-18 07:15:00 |  long | London |    FVG |    5 |  3643.05 |  3636.84 |  3655.47 |  3653.81 | TP1+SL |   8.21 | 1.79
+    2025-09-18 08:35:00 |  long | London |    FVG |    6 |  3655.34 |  3650.99 |  3664.03 |  3668.38 |    TP2 |   8.60 | 2.38
+    2025-09-18 13:00:00 |  long |  NY_AM |    FVG |    5 |  3669.78 |  3664.62 |  3680.10 |  3664.58 |     SL |  -4.73 | -1.1
+    2025-09-19 13:10:00 |  long |  NY_AM |     EQ |    6 |  3652.78 |  3647.84 |  3662.67 |  3659.40 | TP1+SL |   6.43 | 1.57
+    2025-09-19 14:05:00 |  long |  NY_AM |    FVG |    6 |  3658.90 |  3653.29 |  3670.11 |  3675.71 |    TP2 |  11.22 | 2.41
     ...
-    2026-02-19 14:05:00 | short |  NY_AM |    FVG |    4 |  4990.93 |  5001.79 |  4969.20 |  4991.01 | TP1+SL |   0.52 | 0.95
-    2026-02-20 07:15:00 | short | London |    FVG |    4 |  5023.57 |  5031.22 |  5008.26 |  5023.63 | TP1+SL |   0.50 | 0.93
-    2026-02-20 15:15:00 | short |  NY_AM |    FVG |    5 |  5039.74 |  5062.67 |  4993.90 |  5062.72 |     SL |  -0.47 | -1.02
-    2026-02-24 15:20:00 |  long |  NY_AM |    FVG |    6 |  5127.33 |  5111.09 |  5159.80 |  5176.04 |    TP2 |   1.20 | 2.47
-    2026-02-25 14:25:00 |  long |  NY_AM |     EQ |    5 |  5187.97 |  5180.42 |  5203.07 |  5180.34 |     SL |  -0.57 | -1.08
-    2026-02-25 15:25:00 |  long |  NY_AM |    FVG |    6 |  5184.91 |  5170.91 |  5212.93 |  5184.89 | TP1+SL |   0.54 | 0.96
-    2026-02-26 08:30:00 | short | London |    FVG |    5 |  5182.91 |  5191.77 |  5165.20 |  5183.00 | TP1+SL |   0.50 | 0.94
-    2026-02-26 18:30:00 | short |  NY_PM |     EQ |    5 |  5171.57 |  5181.03 |  5152.64 |  5181.09 |     SL |  -0.50 | -1.06
-    2026-02-27 09:50:00 | short | London |    FVG |    5 |  5178.86 |  5184.64 |  5167.31 |  5184.65 |     SL |  -0.50 | -1.09
-    2026-02-27 13:35:00 | short |  NY_AM |    FVG |    4 |  5229.63 |  5242.36 |  5204.17 |  5242.42 |     SL |  -0.53 | -1.04
+    2026-02-19 15:10:00 | short |  NY_AM |    FVG |    5 |  4982.36 |  4996.64 |  4953.80 |  4996.67 |     SL |  -1.04 | -1.04
+    2026-02-20 07:50:00 | short | London |    FVG |    5 |  5018.32 |  5025.91 |  5003.16 |  5026.00 |     SL |  -1.14 | -1.08
+    2026-02-20 15:15:00 | short |  NY_AM |    FVG |    5 |  5039.74 |  5062.67 |  4993.90 |  5062.74 |     SL |  -1.17 | -1.03
+    2026-02-24 15:20:00 |  long |  NY_AM |    FVG |    6 |  5127.33 |  5111.09 |  5159.80 |  5154.07 | TP1+SL |   2.04 | 1.79
+    2026-02-25 14:25:00 |  long |  NY_AM |     EQ |    5 |  5187.97 |  5180.42 |  5203.07 |  5180.36 |     SL |  -1.14 | -1.07
+    2026-02-25 15:25:00 |  long |  NY_AM |    FVG |    6 |  5184.91 |  5170.91 |  5212.93 |  5203.69 | TP1+SL |   1.83 | 1.63
+    2026-02-26 08:30:00 | short | London |    FVG |    5 |  5182.91 |  5191.77 |  5165.20 |  5166.80 | TP1+SL |   1.97 | 1.85
+    2026-02-26 18:30:00 | short |  NY_PM |     EQ |    5 |  5171.57 |  5181.03 |  5152.64 |  5181.11 |     SL |  -1.11 | -1.06
+    2026-02-27 09:50:00 | short | London |    FVG |    5 |  5178.86 |  5184.64 |  5167.31 |  5184.70 |     SL |  -1.14 | -1.1
+    2026-02-27 15:50:00 | short |  NY_AM |    FVG |    5 |  5227.91 |  5242.87 |  5197.99 |  5242.92 |     SL |  -1.09 | -1.04
 
 12. PROBLEMS IDENTIFIED
-    - 1-bar trades (SL/TP hit within 5min): 43/142 (30.3%)
+    - 1-bar trades (SL/TP hit within 5min): 38/129 (29.5%)
       OK: Less than 50% are 1-bar trades — ATR sizing is working.
     - Trades outside killzones: 0 (should be 0)
 
@@ -120,15 +119,15 @@ Data: XAUUSD 5-min, 2025-09-01 00:00:00 to 2026-02-27 21:55:00
     +-------------------+-----------+-----------+
     | Metric            | Before    | After     |
     +-------------------+-----------+-----------+
-    | Trades            |       102 |       142 |
-    | Win Rate          |     42.2% |     43.7% |
-    | Profit Factor     |      0.94 |      1.38 |
-    | Sharpe            |     -0.17 |      1.14 |
-    | Max DD            |     -2.6% |     -2.2% |
-    | Avg R:R           |     ~0.01 |      0.21 |
-    | Avg Duration      |     5 min |   138 min |
-    | Total P&L         |    -$2.12 |    $31.92 |
-    | CAGR              |     -0.9% |     13.4% |
+    | Trades            |       102 |       129 |
+    | Win Rate          |     42.2% |     47.3% |
+    | Profit Factor     |      0.94 |      1.69 |
+    | Sharpe            |     -0.17 |      1.87 |
+    | Max DD            |     -2.6% |     -2.1% |
+    | Avg R:R           |     ~0.01 |      0.33 |
+    | Avg Duration      |     5 min |    95 min |
+    | Total P&L         |    -$2.12 |    $96.52 |
+    | CAGR              |     -0.9% |     20.6% |
     +-------------------+-----------+-----------+
 
 14. NEXT STEPS RECOMMENDATIONS

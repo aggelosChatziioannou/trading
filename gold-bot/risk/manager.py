@@ -56,6 +56,7 @@ class Position:
     exit_price: float = 0.0
     exit_time: datetime | None = None
     pnl: float = 0.0
+    best_price_since_tp1: float = 0.0  # For trailing stop after TP1
 
     def __post_init__(self):
         self.remaining_oz = self.total_oz
@@ -172,7 +173,7 @@ class RiskManager:
                 fills.append({"type": "SL", "pnl": pnl, "position": pos})
                 continue
 
-            # Check TP1 (Change 7: close 50%, move SL to breakeven)
+            # Check TP1 (close 50%, move SL to breakeven, start trailing)
             if not pos.tp1_hit:
                 tp1_hit = ((pos.direction == "long" and high >= pos.tp1) or
                            (pos.direction == "short" and low <= pos.tp1))
@@ -186,10 +187,32 @@ class RiskManager:
                     pos.tp1_hit = True
                     pos.remaining_oz -= close_oz
                     pos.stop_loss = pos.entry_price  # Move SL to breakeven
+                    # Initialize trailing: track best price from TP1 level
+                    pos.best_price_since_tp1 = pos.tp1
                     fills.append({"type": "TP1", "pnl": pnl, "position": pos})
 
-            # Check TP2 (close remaining 50%)
+            # After TP1: Trail stop + check TP2 hard target
+            # ICT trailing methodology: trail SL 1.5x ATR behind best price
+            # This captures extended Power of 3 distribution moves
             if pos.tp1_hit and not pos.tp2_hit:
+                # Update best price since TP1
+                sl_distance = abs(pos.entry_price - pos.original_sl)
+                trail_distance = sl_distance * 1.0  # Trail at 1x original risk
+
+                if pos.direction == "long":
+                    pos.best_price_since_tp1 = max(pos.best_price_since_tp1, high)
+                    new_trailing_sl = pos.best_price_since_tp1 - trail_distance
+                    # Only ratchet up, never down
+                    if new_trailing_sl > pos.stop_loss:
+                        pos.stop_loss = new_trailing_sl
+                else:
+                    pos.best_price_since_tp1 = min(pos.best_price_since_tp1, low)
+                    new_trailing_sl = pos.best_price_since_tp1 + trail_distance
+                    # Only ratchet down, never up
+                    if new_trailing_sl < pos.stop_loss:
+                        pos.stop_loss = new_trailing_sl
+
+                # Check TP2 hard target (still keep it as max exit)
                 tp2_hit = ((pos.direction == "long" and high >= pos.tp2) or
                            (pos.direction == "short" and low <= pos.tp2))
                 if tp2_hit:

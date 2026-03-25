@@ -130,3 +130,59 @@
 3. **OTE entry (62-79% fib retracement)** — ICT Optimal Trade Entry for tighter SL
 4. **Volatility regime filter** — Skip trades when ATR is abnormally low or extreme
 5. **H1 FVG as additional confluence** — Research shows H1 FVGs have higher fill rates than M5
+
+---
+
+## Run 3: 2026-03-25 (Trading Schedule — Queued Improvements)
+
+### Baseline (after Run 2)
+- Trades: 129 | WR: 47.3% | PF: 1.69 | Sharpe: 1.87 | MaxDD: -2.1% | P&L: $96.55
+
+### Attempt 1: OTE Entry (70.5% fib retracement of FVG)
+- Theory: ICT Optimal Trade Entry — the 62-79% fib retracement of an impulse move is where institutions reload orders. The precise OTE is 0.705. Entering deeper in the FVG gives a better price and tighter SL. Source: innercircletrader.net OTE tutorial, ForexFactory OTE guide, howtotrade.com
+- Change: Modified FVG entry from CE (50%) to OTE (70.5% retracement within FVG zone). For bullish FVGs, entry is 70.5% from top toward bottom (deeper = better price). For bearish, 70.5% from bottom toward top.
+- Result: Trades: 129 | WR: 49.6% | PF: 1.72 | Sharpe: 1.93 | MaxDD: -2.2% | P&L: $105.84
+- Verdict: **BETTER** — WR +2.3pp, PF +0.03, Sharpe +0.06, P&L +$9.29
+- Applied: **YES**
+
+### Attempt 2: Volatility Regime Filter (skip low/high ATR)
+- Theory: Low ATR = no displacement possible, FVGs are noise. Extreme ATR = erratic execution. Source: market microstructure, quantvps.com
+- Change: Skip trades when ATR < 25th percentile or > 95th percentile of rolling ATR
+- Result: Trades: 103 | WR: 48.5% | PF: 1.67 | Sharpe: 1.67 | MaxDD: -2.9% | P&L: $102.99
+- Verdict: **WORSE** — removed 20% of trades, PF and Sharpe dropped
+- Applied: **NO**
+- Learning: The ATR percentile approach is too crude. Gold's ATR distribution is wide and the filter catches too many valid setups. A better approach might be minimum absolute ATR floor ($2) instead of percentile.
+
+### Attempt 3: H1 FVG as Additional Confluence
+- Theory: Higher timeframe FVGs have higher fill rates and institutional significance. M5 entry within an unfilled H1 FVG adds quality. Source: edgeful.com FVG research, tradervue.com
+- Change: Added h1_fvg confluence type — detect FVGs on 1H data, if current price is within an unfilled H1 FVG matching trade direction, add +1 confluence score
+- Result: Trades: 132 | WR: 46.2% | PF: 1.46 | Sharpe: 1.38 | MaxDD: -2.9% | P&L: $68.55
+- Verdict: **WORSE** — PF dropped 1.72→1.46, Sharpe 1.93→1.38
+- Applied: **NO**
+- Learning: The H1 FVGs on resampled data may not be clean enough. The additional trades at Score 6/7 weren't actually higher quality. H1 FVG detection may need separate ATR calibration for H1 timeframe.
+
+### Attempt 4: Session-Specific ATR
+- Theory: London and NY have different volatility profiles. Session-local ATR gives better calibrated SL per session. Source: CME Group volume data
+- Change: Filter ATR calculation history to only same-session bars (London hours for London entries, NY hours for NY entries)
+- Result: Trades: 129 | WR: 49.6% | PF: 1.72 | Sharpe: 1.93 | MaxDD: -2.2% | P&L: $105.87
+- Verdict: **NEUTRAL** — essentially identical, marginally better session-level WR
+- Applied: **YES** (theoretically sounder, zero downside)
+
+### Final State After Run 3
+- Trades: 129 | WR: 49.6% | PF: 1.72 | Sharpe: 1.93 | MaxDD: -2.2% | P&L: $105.87
+- CAGR: 22.7% | Calmar: 10.2 | Recovery: 4.43
+
+### Cumulative Progress
+- Total optimization runs: 3
+- Successful improvements: 4 (confluence filter, trailing stop, OTE entry, session ATR)
+- Failed attempts: 3 (P/D zone 24H, vol regime filter, H1 FVG confluence)
+- Current best PF: 1.72 (started at 0.94)
+- Current best Sharpe: 1.93 (started at -0.17)
+- Progression: 0.94 → 1.38 → 1.54 → 1.69 → 1.72
+
+### Ideas for Next Run
+1. **Premium/Discount with H4 swing range** — Use H4 swing high/low as dealing range instead of 24H rolling
+2. **Minimum absolute ATR floor** — Skip trades when ATR < $2.00 (too quiet for displacement)
+3. **EQ entry quality** — EQ entries still at 38.7% WR vs FVG 50%. Consider requiring EQ entries to have confluence >= 6
+4. **Trailing stop optimization** — Test different trail distances (0.75x risk, 1.25x risk)
+5. **Asian range width filter** — If Asian range > 2x median, manipulation may be done already

@@ -100,8 +100,40 @@ class ICTEntryModel:
         if self.session_trades.get(session, 0) >= MAX_TRADES_PER_SESSION:
             return None
 
-        # ── Compute ATR (Change 1) ───────────────────────────────────
-        atr = get_current_atr(gold_5m_history)
+        # ── Compute ATR (Session-specific) ──────────────────────────
+        # Theory: London and NY have different volatility profiles.
+        # Using session-local ATR gives better calibrated SL per session.
+        # Source: CME Group volume data, professional gold trader practice.
+        import pytz
+        _et = pytz.timezone("US/Eastern")
+        dt_et = dt.astimezone(_et) if dt.tzinfo else pytz.utc.localize(dt).astimezone(_et)
+        hour_et = dt_et.hour
+
+        # Filter history to same session type for ATR
+        history_tz = gold_5m_history.copy()
+        if history_tz.index.tz is None:
+            history_tz.index = history_tz.index.tz_localize("UTC")
+        history_et = history_tz.copy()
+        history_et.index = history_et.index.tz_convert(_et)
+        hours = history_et.index.hour
+
+        if 2 <= hour_et < 5:  # London
+            session_mask = (hours >= 2) & (hours < 5)
+        elif 8 <= hour_et < 11:  # NY AM
+            session_mask = (hours >= 8) & (hours < 11)
+        elif 13 <= hour_et < 15:  # NY PM
+            session_mask = (hours >= 13) & (hours < 15)
+        else:
+            session_mask = pd.Series(True, index=history_et.index)
+
+        if hasattr(session_mask, 'values'):
+            mask_arr = session_mask.values
+        else:
+            mask_arr = session_mask
+        session_history = gold_5m_history[mask_arr] if mask_arr.sum() >= 20 else gold_5m_history
+        atr = get_current_atr(session_history)
+        if atr <= 0:
+            atr = get_current_atr(gold_5m_history)  # Fallback to global ATR
         if atr <= 0:
             return None
 
@@ -220,11 +252,25 @@ class ICTEntryModel:
                        if ob.direction == sweep_dir and not ob.broken
                        and ob.timestamp >= lookback_time]
 
+        # OTE entry calculation helper
+        # ICT OTE: 70.5% fib retracement of the impulse move
+        # Source: innercircletrader.net, ForexFactory OTE guide
+        # For bullish: entry deeper into FVG (lower price = better R:R)
+        # For bearish: entry deeper into FVG (higher price = better R:R)
+        def _ote_price(fvg_obj):
+            """Calculate OTE entry: 70.5% retracement within the FVG zone."""
+            if sweep_dir == "bullish":
+                # Bullish: OTE is 70.5% from top toward bottom (deeper = better)
+                return fvg_obj.top - (fvg_obj.top - fvg_obj.bottom) * 0.705
+            else:
+                # Bearish: OTE is 70.5% from bottom toward top (deeper = better)
+                return fvg_obj.bottom + (fvg_obj.top - fvg_obj.bottom) * 0.705
+
         # OB+FVG: FVG inside an OB zone
         for fvg in matching_fvgs:
             for ob in matching_obs:
                 if fvg.bottom >= ob.zone_low and fvg.top <= ob.zone_high + atr:
-                    entry_price = fvg.ce  # Consequent Encroachment
+                    entry_price = _ote_price(fvg)  # OTE entry
                     entry_type = "OB+FVG"
                     confluence.add("ob_fvg")
                     confluence.add("fvg")
@@ -232,10 +278,10 @@ class ICTEntryModel:
             if entry_price is not None:
                 break
 
-        # Standalone FVG (use CE midpoint, not edge)
+        # Standalone FVG (use OTE 70.5% instead of CE 50%)
         if entry_price is None and matching_fvgs:
             fvg = matching_fvgs[-1]
-            entry_price = fvg.ce  # CE entry for precision
+            entry_price = _ote_price(fvg)  # OTE entry for precision
             entry_type = "FVG"
             confluence.add("fvg")
 

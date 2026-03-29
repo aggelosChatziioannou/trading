@@ -1,0 +1,19 @@
+{
+  "initial_capital": 1000.0,
+  "current_balance": 998.8,
+  "total_equity": 998.8,
+  "risk_per_trade_pct": 1.5,
+  "max_daily_loss_pct": 5.0,
+  "max_concurrent_trades": 3,
+  "target_monthly_return": 100.0,
+  "currency": "EUR",
+  "open_trades": [],
+  "daily_pnl": 11.7,
+  "daily_pnl_date": "2026-03-27",
+  "total_pnl": 11.7,
+  "total_trades": 1,
+  "winning_trades": 1,
+  "losing_trades": 0,
+  "created": "2026-03-26 15:44:53",
+  "last_updated": "2026-03-27 20:17:46"
+}

@@ -1,0 +1,275 @@
+{
+  "timestamp": "2026-03-26 17:12:23",
+  "scan_type": "afternoon",
+  "total_scanned": 15,
+  "results": [
+    {
+      "symbol": "GOOGL",
+      "name": "Google",
+      "type": "stock",
+      "price": 286.2099914550781,
+      "price_fmt": ",.2f",
+      "change_pct": -1.62,
+      "rsi": 30.9,
+      "trend": "BEAR",
+      "volume_ratio": 0.38,
+      "scores": {
+        "volume_spike": 0,
+        "trend_clarity": 88,
+        "rsi_setup": 30,
+        "gap_breakout": 80,
+        "adr_room": 60
+      },
+      "total_score": 49.0
+    },
+    {
+      "symbol": "META",
+      "name": "Meta",
+      "type": "stock",
+      "price": 563.969970703125,
+      "price_fmt": ",.2f",
+      "change_pct": -5.2,
+      "rsi": 28.3,
+      "trend": "BEAR",
+      "volume_ratio": 0.86,
+      "scores": {
+        "volume_spike": 0,
+        "trend_clarity": 100,
+        "rsi_setup": 30,
+        "gap_breakout": 100,
+        "adr_room": 0
+      },
+      "total_score": 46.0
+    },
+    {
+      "symbol": "NVDA",
+      "name": "Nvidia",
+      "type": "stock",
+      "price": 174.08999633789062,
+      "price_fmt": ",.2f",
+      "change_pct": -2.57,
+      "rsi": 41.3,
+      "trend": "BEAR",
+      "volume_ratio": 0.31,
+      "scores": {
+        "volume_spike": 0,
+        "trend_clarity": 81,
+        "rsi_setup": 20,
+        "gap_breakout": 40,
+        "adr_room": 60
+      },
+      "total_score": 39.2
+    },
+    {
+      "symbol": "TSLA",
+      "name": "Tesla",
+      "type": "stock",
+      "price": 380.1799011230469,
+      "price_fmt": ",.2f",
+      "change_pct": -1.5,
+      "rsi": 40.4,
+      "trend": "BEAR",
+      "volume_ratio": 0.32,
+      "scores": {
+        "volume_spike": 0,
+        "trend_clarity": 92,
+        "rsi_setup": 20,
+        "gap_breakout": 20,
+        "adr_room": 60
+      },
+      "total_score": 39.0
+    },
+    {
+      "symbol": "COIN",
+      "name": "Coinbase",
+      "type": "stock",
+      "price": 175.3699951171875,
+      "price_fmt": ",.2f",
+      "change_pct": -3.16,
+      "rsi": 40.6,
+      "trend": "BEAR",
+      "volume_ratio": 0.26,
+      "scores": {
+        "volume_spike": 0,
+        "trend_clarity": 66,
+        "rsi_setup": 20,
+        "gap_breakout": 60,
+        "adr_room": 60
+      },
+      "total_score": 38.5
+    },
+    {
+      "symbol": "MSFT",
+      "name": "Microsoft",
+      "type": "stock",
+      "price": 370.4649963378906,
+      "price_fmt": ",.2f",
+      "change_pct": -0.15,
+      "rsi": 27.3,
+      "trend": "BEAR",
+      "volume_ratio": 0.33,
+      "scores": {
+        "volume_spike": 0,
+        "trend_clarity": 100,
+        "rsi_setup": 30,
+        "gap_breakout": 0,
+        "adr_room": 40
+      },
+      "total_score": 37.0
+    },
+    {
+      "symbol": "INTC",
+      "name": "Intel",
+      "type": "stock",
+      "price": 44.845001220703125,
+      "price_fmt": ",.2f",
+      "change_pct": -4.95,
+      "rsi": 48.5,
+      "trend": "BEAR",
+      "volume_ratio": 0.39,
+      "scores": {
+        "volume_spike": 0,
+        "trend_clarity": 58,
+        "rsi_setup": 20,
+        "gap_breakout": 60,
+        "adr_room": 40
+      },
+      "total_score": 33.5
+    },
+    {
+      "symbol": "AMD",
+      "name": "AMD",
+      "type": "stock",
+      "price": 207.97999572753906,
+      "price_fmt": ",.2f",
+      "change_pct": -5.58,
+      "rsi": 51.8,
+      "trend": "BULL",
+      "volume_ratio": 0.6,
+      "scores": {
+        "volume_spike": 0,
+        "trend_clarity": 62,
+        "rsi_setup": 20,
+        "gap_breakout": 60,
+        "adr_room": 0
+      },
+      "total_score": 28.5
+    },
+    {
+      "symbol": "PLTR",
+      "name": "Palantir",
+      "type": "stock",
+      "price": 149.4600067138672,
+      "price_fmt": ",.2f",
+      "change_pct": -3.55,
+      "rsi": 48.3,
+      "trend": "BULL",
+      "volume_ratio": 0.33,
+      "scores": {
+        "volume_spike": 0,
+        "trend_clarity": 30,
+        "rsi_setup": 20,
+        "gap_breakout": 60,
+        "adr_room": 40
+      },
+      "total_score": 26.5
+    },
+    {
+      "symbol": "BTC",
+      "name": "Bitcoin",
+      "type": "crypto",
+      "price": 69189.3984375,
+      "price_fmt": ",.0f",
+      "change_pct": -2.97,
+      "rsi": 47.0,
+      "trend": "BULL",
+      "volume_ratio": 0.85,
+      "scores": {
+        "volume_spike": 0,
+        "trend_clarity": 30,
+        "rsi_setup": 20,
+        "gap_breakout": 40,
+        "adr_room": 40
+      },
+      "total_score": 23.5
+    },
+    {
+      "symbol": "ETH",
+      "name": "Ethereum",
+      "type": "crypto",
+      "price": 2068.171142578125,
+      "price_fmt": ",.2f",
+      "change_pct": -4.61,
+      "rsi": 46.7,
+      "trend": "BULL",
+      "volume_ratio": 0.83,
+      "scores": {
+        "volume_spike": 0,
+        "trend_clarity": 30,
+        "rsi_setup": 20,
+        "gap_breakout": 60,
+        "adr_room": 20
+      },
+      "total_score": 23.5
+    },
+    {
+      "symbol": "SOL",
+      "name": "Solana",
+      "type": "crypto",
+      "price": 87.35662841796875,
+      "price_fmt": ",.2f",
+      "change_pct": -4.75,
+      "rsi": 47.2,
+      "trend": "BULL",
+      "volume_ratio": 0.98,
+      "scores": {
+        "volume_spike": 0,
+        "trend_clarity": 30,
+        "rsi_setup": 20,
+        "gap_breakout": 60,
+        "adr_room": 0
+      },
+      "total_score": 20.5
+    },
+    {
+      "symbol": "AAPL",
+      "name": "Apple",
+      "type": "stock",
+      "price": 256.3450012207031,
+      "price_fmt": ",.2f",
+      "change_pct": 1.47,
+      "rsi": 48.5,
+      "trend": "BEAR",
+      "volume_ratio": 0.28,
+      "scores": {
+        "volume_spike": 0,
+        "trend_clarity": 30,
+        "rsi_setup": 20,
+        "gap_breakout": 20,
+        "adr_room": 0
+      },
+      "total_score": 14.5
+    },
+    {
+      "symbol": "AMZN",
+      "name": "Amazon",
+      "type": "stock",
+      "price": 212.3300018310547,
+      "price_fmt": ",.2f",
+      "change_pct": 0.29,
+      "rsi": 50.1,
+      "trend": "BEAR",
+      "volume_ratio": 0.31,
+      "scores": {
+        "volume_spike": 0,
+        "trend_clarity": 30,
+        "rsi_setup": 20,
+        "gap_breakout": 0,
+        "adr_room": 0
+      },
+      "total_score": 11.5
+    }
+  ],
+  "hot": [],
+  "warm": []
+}

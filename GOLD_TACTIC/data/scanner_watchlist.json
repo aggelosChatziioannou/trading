@@ -1,0 +1,21 @@
+{
+  "scan_timestamp": "2026-03-29T15:26:00+03:00",
+  "scan_type": "morning",
+  "weekend_mode": true,
+  "active_today": ["BTC", "SOL"],
+  "skip_today": {
+    "EURUSD": "Weekend — Forex market closed",
+    "GBPUSD": "Weekend — Forex market closed",
+    "NAS100": "Weekend — US equity market closed"
+  },
+  "active_reasons": {
+    "BTC": "RSI 42.1 (daily) in range, 4H RSI 30.8 approaching oversold. Daily+4H bearish aligned. Price $66,716 testing $65K support zone. Short bias but 4H oversold — watch for bounce or breakdown.",
+    "SOL": "RSI 40.9 (daily) in range, 4H RSI 35.7. Daily+4H bearish aligned, below all EMAs. Price $82.38 approaching $80 psychological support. Short bias, similar structure to BTC."
+  },
+  "analyst_instructions": {
+    "BTC": "BEARISH BIAS. Price below SMA50 (71.3K) and EMA21 (67.8K on 4H). 4H RSI at 30.8 — near oversold, potential for a relief bounce. Key support: $65,600 (PDL). If $65K breaks cleanly, next target ~$62K. For shorts: wait for retest of $67.3K (PDH) area. For longs: only on strong $65K bounce with volume confirmation. Risk off if no clear setup by evening.",
+    "SOL": "BEARISH BIAS. Price below EMA21 (84.38) and SMA50 (86.60) on 4H. 4H RSI 35.7 — weakening. Key support: $80 psychological level / $82.49 (PDL). If $80 breaks, target $75 area. For shorts: retest of $84 EMA area as resistance. For longs: only on $80 bounce with divergence. Low weekend volume — tight stops."
+  },
+  "nas100_afternoon": false,
+  "active_count": 2
+}

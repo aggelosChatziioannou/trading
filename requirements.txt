@@ -4,13 +4,26 @@ requests>=2.31.0
 pandas>=2.0.0
 numpy>=1.24.0
 
-# Trading
-ccxt>=4.0.0
-python-binance>=1.0.0
-ta-lib>=0.4.0
+# Trading data
+yfinance>=0.2.36
+alpaca-py>=0.13.0
+finnhub-python>=2.4.0
+
+# Charts (GOLD_TACTIC chart_generator.py)
+mplfinance>=0.12.10b0
+matplotlib>=3.7.0
+
+# Technical Analysis
+ta>=0.11.0
+pandas-ta>=0.3.14b
+
+# News
+feedparser>=6.0.10
+beautifulsoup4>=4.12.0
 
 # Notifications
 python-telegram-bot>=20.0
+pyTelegramBotAPI>=4.14.0
 
 # Database
 sqlalchemy>=2.0.0

@@ -16,8 +16,38 @@ ENV/
 data/raw/
 data/processed/
 *.csv
+
+# Global JSON exclusion (overridden below for GOLD_TACTIC)
 *.json
 !data/.gitkeep
+
+# GOLD_TACTIC — include scripts, prompts, data templates, backtest results
+!GOLD_TACTIC/scripts/**
+!GOLD_TACTIC/prompts/**
+!GOLD_TACTIC/backtest/**
+!GOLD_TACTIC/data/emergency_activations.json
+!GOLD_TACTIC/data/portfolio.json
+!GOLD_TACTIC/data/trade_history.json
+!GOLD_TACTIC/data/opportunities.json
+!GOLD_TACTIC/data/scanner_watchlist.json
+!GOLD_TACTIC/data/research_notes.md
+!GOLD_TACTIC/data/trade_journal.md
+!GOLD_TACTIC/screenshots/charts_meta.json
+
+# GOLD_TACTIC — exclude generated/runtime/binary files
+GOLD_TACTIC/screenshots/*.png
+GOLD_TACTIC/screenshots/*.txt
+GOLD_TACTIC/screenshots/daily.png
+GOLD_TACTIC/screenshots/h4.png
+GOLD_TACTIC/screenshots/m5.png
+GOLD_TACTIC/data/live_prices.json
+GOLD_TACTIC/data/news_feed.json
+GOLD_TACTIC/data/session_log.md
+GOLD_TACTIC/data/telegram_message.txt
+GOLD_TACTIC/archive/
+GOLD_TACTIC/scripts/__pycache__/
+GOLD_TACTIC/news_feed.json
+GOLD_TACTIC/opportunities.json
 
 # Logs
 logs/

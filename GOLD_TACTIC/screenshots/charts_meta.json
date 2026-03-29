@@ -1,0 +1,51 @@
+{
+  "version": "2.0",
+  "timestamp": "2026-03-29 15:53:25",
+  "assets": [
+    "EURUSD",
+    "GBPUSD",
+    "NAS100",
+    "SOL",
+    "BTC"
+  ],
+  "charts_generated": 15,
+  "errors": 0,
+  "features": [
+    "asia_range",
+    "session_separators",
+    "pdh_pdl",
+    "rsi",
+    "adr_consumed",
+    "current_price",
+    "forex_volume_fix",
+    "4h_utc_alignment",
+    "today_zoom_5m"
+  ],
+  "files": {
+    "EURUSD": {
+      "daily": "/sessions/nice-practical-cray/mnt/GOLD_TACTIC/screenshots/EURUSD_daily.png",
+      "4h": "/sessions/nice-practical-cray/mnt/GOLD_TACTIC/screenshots/EURUSD_4h.png",
+      "5m": "/sessions/nice-practical-cray/mnt/GOLD_TACTIC/screenshots/EURUSD_5m.png"
+    },
+    "GBPUSD": {
+      "daily": "/sessions/nice-practical-cray/mnt/GOLD_TACTIC/screenshots/GBPUSD_daily.png",
+      "4h": "/sessions/nice-practical-cray/mnt/GOLD_TACTIC/screenshots/GBPUSD_4h.png",
+      "5m": "/sessions/nice-practical-cray/mnt/GOLD_TACTIC/screenshots/GBPUSD_5m.png"
+    },
+    "NAS100": {
+      "daily": "/sessions/nice-practical-cray/mnt/GOLD_TACTIC/screenshots/NAS100_daily.png",
+      "4h": "/sessions/nice-practical-cray/mnt/GOLD_TACTIC/screenshots/NAS100_4h.png",
+      "5m": "/sessions/nice-practical-cray/mnt/GOLD_TACTIC/screenshots/NAS100_5m.png"
+    },
+    "SOL": {
+      "daily": "/sessions/nice-practical-cray/mnt/GOLD_TACTIC/screenshots/SOL_daily.png",
+      "4h": "/sessions/nice-practical-cray/mnt/GOLD_TACTIC/screenshots/SOL_4h.png",
+      "5m": "/sessions/nice-practical-cray/mnt/GOLD_TACTIC/screenshots/SOL_5m.png"
+    },
+    "BTC": {
+      "daily": "/sessions/nice-practical-cray/mnt/GOLD_TACTIC/screenshots/BTC_daily.png",
+      "4h": "/sessions/nice-practical-cray/mnt/GOLD_TACTIC/screenshots/BTC_4h.png",
+      "5m": "/sessions/nice-practical-cray/mnt/GOLD_TACTIC/screenshots/BTC_5m.png"
+    }
+  }
+}

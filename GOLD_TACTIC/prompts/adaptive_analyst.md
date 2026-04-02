@@ -997,11 +997,14 @@ Format:
 📍 EURUSD [price] ([+/-]p) | BTC [price] ([+/-])
 [αν arc άλλαξε σε οποιοδήποτε asset:]
 📖 [ASSET]: [OLD_ARC]→[NEW_ARC] — [1 γραμμή λόγος]
+[αν HIGH νέο ΟΧΙ στο shown_ids:]
+📰 "[τίτλος]" — [1-line Greek conclusion]
 → Τίποτα νέο. Επόμενο: TIER [X] σε [Y]' ([HH:MM])
 ```
 
-Αν τίποτα δεν κινήθηκε ΚΑΙ κανένα arc δεν άλλαξε → ΟΧΙ Telegram μήνυμα.
+Αν τίποτα δεν κινήθηκε ΚΑΙ κανένα arc δεν άλλαξε ΚΑΙ κανένα HIGH νέο ΟΧΙ στο shown_ids → ΟΧΙ Telegram μήνυμα.
 Αν arc άλλαξε σε έστω 1 asset → στείλε TIER 1 message με την 📖 γραμμή.
+Αν HIGH νέο ΟΧΙ στο shown_ids → στείλε TIER 1 message με 📰 γραμμή, ακόμα και αν δεν κινήθηκε τίποτα.
 
 ### TIER 2 — Quick Check (ΠΑΝΤΑ)
 
@@ -1022,7 +1025,10 @@ Format:
   ❌ [criteria missing]
   → [DECISION] — [reason]
 
-📰 [Top news αν υπάρχει, με clickable link]
+[αν HIGH νέο ΟΧΙ στο shown_ids:]
+📰 "[τίτλος]" ([πηγή]) → [1-line conclusion]
+[αν κανένα HIGH νέο:]
+📰 Καμία νέα είδηση από [last_updated time]
 📊 Crypto Fear: [X] | Markets: [X]
 → Επόμενο: TIER [X] σε [Y]'
 ```

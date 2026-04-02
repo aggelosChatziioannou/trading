@@ -44,6 +44,9 @@ GOLD_TACTIC/screenshots/h4.png
 GOLD_TACTIC/screenshots/m5.png
 GOLD_TACTIC/data/live_prices.json
 GOLD_TACTIC/data/telegram_log.json
+GOLD_TACTIC/data/next_cycle.json
+GOLD_TACTIC/data/runner_log.txt
+GOLD_TACTIC/data/scanner_afternoon_ran.txt
 GOLD_TACTIC/data/news_feed.json
 GOLD_TACTIC/data/session_log.md
 GOLD_TACTIC/data/telegram_message.txt

@@ -1155,22 +1155,35 @@ Format:
 #### ⚪ ZONE 3 — ΕΙΔΗΣΕΙΣ
 
 ```html
-📰 <b>ΝΕΑ</b>
+📰 <b>ΝΕΑ</b> (vs [last_cycle_time] EET)
 
-🆕 "[τίτλος σε απλά ελληνικά]" ([πηγή], [ΩΩ:ΛΛ])
-   → [ΤΙ ΣΗΜΑΙΝΕΙ για τα assets μας] [🔴/🟢]
-   → <a href="[url]">Διάβασε</a>
+[📌 escalation αν ισχύουν και τα 3 κριτήρια — εμφανίζεται ΠΡΩΤΟ]
+📌 Νέο [ΩΩ:ΛΛ] επιβεβαιώνεται — "[τίτλος αρχικού νέου]"
+   → [τιμή] κινήθηκε [+X pips] σύμφωνα με [BULLISH/BEARISH call]
+
+[Νέα άρθρα — ΟΧΙ στο shown_ids — ταξινομημένα HIGH → MEDIUM → LOW]
+🔴 "[τίτλος]" ([πηγή], [ΩΩ:ΛΛ])
+   → [1-line Greek conclusion] [🟢/🔴 per active asset]
+   → <a href="[url]">Διάβασε</a>   [παράλειψε αυτή τη γραμμή αν δεν υπάρχει url]
+
+🟡 "[τίτλος]" ([πηγή], [ΩΩ:ΛΛ])
+   → [1-line Greek conclusion]
+   [χωρίς link αν δεν υπάρχει url]
+
+[⚪ LOW παραλείπονται αν υπάρχουν HIGH ή MEDIUM]
+[Αν ΟΛΑ τα άρθρα στο shown_ids:]
+📰 Καμία νέα είδηση από [last_updated]. Κλίμα: [1 γραμμή sentiment]
 
 📊 Sentiment: Crypto Fear [X] | Markets [X]
 📅 Επόμενο event: [EVENT] σε [Xh] ([HIGH/MEDIUM])
 ```
 
-**Κανόνες νέων:**
-- Δείξε ΜΟΝΟ νέα που αφορούν ΤΑ ASSETS ΜΑΣ
-- ΜΗΝ αναφέρεις νέο που ήδη ανέφερες σε προηγούμενο κύκλο
-- Κράτα ΜΟΝΟ νέα με timestamp ΜΕΤΑ από τον τελευταίο κύκλο
-- Αν ΟΛΑ παλαιότερα → `📰 Καμία νέα είδηση. Κλίμα: [1 γραμμή]`
-- Κάθε νέο να έχει clickable link `<a href>` αν διαθέσιμο
+**Κανόνες:**
+- Χρησιμοποίησε `shown_ids` από `news_digest.json` για dedup (όχι timestamps)
+- Sorting: 🔴 HIGH → 🟡 MEDIUM → ⚪ LOW
+- ⚪ LOW εμφανίζονται ΜΟΝΟ αν δεν υπάρχουν HIGH/MEDIUM νέα
+- Link rule: αν `url` κενό ή απόν → παράλειψε τη γραμμή `→ <a href>`
+- Κάθε εμφανιζόμενο άρθρο ΠΡΕΠΕΙ να έχει 1-line conclusion (αλλιώς παράλειψε)
 
 #### 📋 ZONE 4 — SESSION PREVIEW (σε transition points + EOD)
 

@@ -14,11 +14,32 @@ import urllib.request
 import json
 import sys
 import os
+from datetime import datetime
 from pathlib import Path
 
 TOKEN = '8621254551:AAF3z5R-5JrAzTKaZQ31E3pmXxtlvQ10wFc'
 CHAT_ID = '-1003767339297'
 SCREENSHOTS_DIR = Path(__file__).parent.parent / "screenshots"
+DATA_DIR = Path(__file__).parent.parent / "data"
+LOG_FILE = DATA_DIR / "telegram_log.json"
+
+
+def _save_message_id(message_id):
+    """Append a sent message_id to telegram_log.json for daily cleanup."""
+    from datetime import date
+    today = date.today().isoformat()
+    # Re-read on every call — never cache
+    if LOG_FILE.exists():
+        try:
+            log = json.loads(LOG_FILE.read_text(encoding='utf-8'))
+        except Exception:
+            log = {}
+    else:
+        log = {}
+    if log.get("date") != today:
+        log = {"date": today, "message_ids": []}
+    log["message_ids"].append(message_id)
+    LOG_FILE.write_text(json.dumps(log, indent=2), encoding='utf-8')
 
 
 def send_message(text, parse_mode='HTML'):
@@ -34,6 +55,8 @@ def send_message(text, parse_mode='HTML'):
                                 headers={'Content-Type': 'application/json'})
     resp = urllib.request.urlopen(req)
     result = json.loads(resp.read().decode())
+    if result.get("ok") and "result" in result:
+        _save_message_id(result["result"]["message_id"])
     return result
 
 
@@ -78,6 +101,8 @@ def send_photo(photo_path, caption=""):
     )
     resp = urllib.request.urlopen(req)
     result = json.loads(resp.read().decode())
+    if result.get("ok") and "result" in result:
+        _save_message_id(result["result"]["message_id"])
     return result
 
 
@@ -128,6 +153,10 @@ def send_media_group(photos_with_captions):
     )
     resp = urllib.request.urlopen(req)
     result = json.loads(resp.read().decode())
+    if result.get("ok") and isinstance(result.get("result"), list):
+        for msg in result["result"]:
+            if "message_id" in msg:
+                _save_message_id(msg["message_id"])
     return result
 
 
@@ -162,6 +191,25 @@ def send_asset_charts(asset=None):
                     send_photo(path, cap)
                 except Exception as e2:
                     print(f"    Failed: {e2}")
+
+
+def send_tier1_pulse(balance, open_trades, asset_prices, next_time):
+    """TIER 1 pulse message — minimal, only if something moved."""
+    prices_str = " | ".join(
+        f"{asset} {price}" for asset, price in asset_prices.items()
+    )
+    text = (
+        f"⚡ PULSE — {datetime.now().strftime('%H:%M')} EET\n"
+        f"💼 {balance}€ | Ανοιχτά: {open_trades}/3\n"
+        f"📍 {prices_str}\n"
+        f"→ Επόμενο: {next_time}"
+    )
+    return send_message(text, parse_mode='HTML')
+
+
+def send_tier2_quick(html_text):
+    """TIER 2 quick check — agent builds the full HTML."""
+    return send_message(html_text, parse_mode='HTML')
 
 
 def main():

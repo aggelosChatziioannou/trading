@@ -22,8 +22,16 @@ if sys.platform == 'win32':
     except Exception:
         pass
 
-TOKEN = '8621254551:AAF3z5R-5JrAzTKaZQ31E3pmXxtlvQ10wFc'
-CHAT_ID = '-1003767339297'
+from dotenv import load_dotenv
+env_path = Path(__file__).parent.parent.parent / ".env"
+if env_path.exists():
+    load_dotenv(env_path)
+
+TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
+CHAT_ID = os.environ.get('TELEGRAM_CHANNEL')
+if not TOKEN or not CHAT_ID:
+    raise ValueError("TELEGRAM_BOT_TOKEN and TELEGRAM_CHANNEL must be set in .env")
+
 DATA_DIR = Path(__file__).parent.parent / "data"
 LOG_FILE = DATA_DIR / "telegram_log.json"
 

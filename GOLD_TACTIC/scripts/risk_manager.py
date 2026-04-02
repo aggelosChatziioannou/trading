@@ -324,8 +324,12 @@ def close_trade(portfolio, asset, close_price, reason="MANUAL"):
 
     if pnl_eur > 0:
         portfolio["winning_trades"] += 1
+        portfolio["consecutive_wins"] = portfolio.get("consecutive_wins", 0) + 1
+        portfolio["consecutive_losses"] = 0
     else:
         portfolio["losing_trades"] += 1
+        portfolio["consecutive_losses"] = portfolio.get("consecutive_losses", 0) + 1
+        portfolio["consecutive_wins"] = 0
 
     # Remove from open trades
     portfolio["open_trades"] = [t for t in portfolio["open_trades"] if t["asset"] != asset]
@@ -379,6 +383,42 @@ def process_tp1(portfolio, asset, price):
             save_portfolio(portfolio)
             return trade, partial_pnl
 
+    return None, 0
+
+
+def update_sl(portfolio, asset, new_sl):
+    """Update stop loss for an open trade."""
+    for trade in portfolio["open_trades"]:
+        if trade["asset"] == asset:
+            old_sl = trade["sl_price"]
+            trade["sl_price"] = new_sl
+            save_portfolio(portfolio)
+            return trade, f"SL updated {old_sl} -> {new_sl}"
+    return None, f"No open trade for {asset}"
+
+
+def process_tp2(portfolio, asset, price):
+    """Process TP2 hit — close remaining position."""
+    for trade in portfolio["open_trades"]:
+        if trade["asset"] == asset:
+            trade["tp2_hit"] = True
+            trade["partial_close_pct"] = 100
+
+            config = ASSET_CONFIG[asset]
+            direction = trade["direction"]
+            if direction == "LONG":
+                pnl_pips = (price - trade["entry_price"]) / config["pip_size"]
+            else:
+                pnl_pips = (trade["entry_price"] - price) / config["pip_size"]
+
+            remaining_pnl = pnl_pips * config["pip_value_per_lot"] * trade["lot_size"]
+            portfolio["current_balance"] += remaining_pnl + trade["risk_amount"]
+            portfolio["daily_pnl"] += remaining_pnl
+            portfolio["total_pnl"] += remaining_pnl
+
+            portfolio["open_trades"] = [t for t in portfolio["open_trades"] if t["asset"] != asset]
+            save_portfolio(portfolio)
+            return trade, remaining_pnl
     return None, 0
 
 
@@ -525,6 +565,41 @@ def main():
         else:
             print(format_telegram_trade_close(trade, portfolio))
 
+    elif cmd == "update_sl":
+        if len(sys.argv) < 4:
+            print("Usage: risk_manager.py update_sl ASSET NEW_SL")
+            return
+        asset = sys.argv[2].upper()
+        new_sl = float(sys.argv[3])
+        trade, error = update_sl(portfolio, asset, new_sl)
+        if error and "No open trade" in error:
+            print(f"❌ {error}")
+        else:
+            print(f"✅ {trade['asset']} SL moved to {trade['sl_price']}")
+
+    elif cmd == "process_tp":
+        if len(sys.argv) < 5:
+            print("Usage: risk_manager.py process_tp ASSET tp1|tp2 PRICE")
+            return
+        asset = sys.argv[2].upper()
+        tp_level = sys.argv[3].lower()
+        price = float(sys.argv[4])
+        if tp_level == "tp1":
+            trade, partial = process_tp1(portfolio, asset, price)
+            if trade:
+                print(f"✅ {asset} TP1 hit @ {price} — closed 50%, partial P&L: {partial:+.2f} EUR")
+                print(f"   SL moved to breakeven ({trade['sl_price']})")
+            else:
+                print(f"❌ No open trade for {asset}")
+        elif tp_level == "tp2":
+            trade, remaining = process_tp2(portfolio, asset, price)
+            if trade:
+                print(f"✅ {asset} TP2 hit @ {price} — closed remaining, P&L: {remaining:+.2f} EUR")
+            else:
+                print(f"❌ No open trade for {asset}")
+        else:
+            print("❌ tp_level must be tp1 or tp2")
+
     elif cmd == "check":
         # Just show status of open trades
         print(format_status(portfolio))
@@ -545,7 +620,7 @@ def main():
 
     else:
         print(f"❌ Unknown command: {cmd}")
-        print("Usage: risk_manager.py [status|open|check|close|history|reset]")
+        print("Usage: risk_manager.py [status|open|check|close|update_sl|process_tp|history|reset]")
 
 if __name__ == "__main__":
     main()

@@ -32,7 +32,14 @@ from pathlib import Path
 OUTPUT_DIR = Path(__file__).parent.parent / "screenshots"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-FINNHUB_API_KEY = "d6vako1r01qiiutb412gd6vako1r01qiiutb4130"
+from dotenv import load_dotenv
+env_path = Path(__file__).parent.parent.parent / ".env"
+if env_path.exists():
+    load_dotenv(env_path)
+
+FINNHUB_API_KEY = os.environ.get('FINNHUB_API_KEY')
+if not FINNHUB_API_KEY:
+    raise ValueError("FINNHUB_API_KEY must be set in .env")
 
 ASSETS = {
     # ---- Core 5 Assets (backtested) ----
@@ -514,9 +521,11 @@ def generate_chart(asset_name, asset_config, tf_name, tf_config):
         rsi_30 = pd.Series(30.0, index=df.index)
         rsi_70 = pd.Series(70.0, index=df.index)
         added_plots.append(mpf.make_addplot(
-            rsi_30, panel=rsi_panel, color='#FF634540', width=0.5, linestyle='--'))
+            rsi_30, panel=rsi_panel, color='#FF634540', width=0.5, linestyle='--',
+            secondary_y=False, ylim=(0, 100)))
         added_plots.append(mpf.make_addplot(
-            rsi_70, panel=rsi_panel, color='#26a69a40', width=0.5, linestyle='--'))
+            rsi_70, panel=rsi_panel, color='#26a69a40', width=0.5, linestyle='--',
+            secondary_y=False, ylim=(0, 100)))
 
         # ---- Chart title ----
         last_close = current_price
@@ -537,6 +546,7 @@ def generate_chart(asset_name, asset_config, tf_name, tf_config):
             "tight_layout": True,
             "returnfig": True,
             "warn_too_much_data": 500,
+            "panel_ratios": (4, 1, 2) if show_volume else (4, 2),
         }
 
         if show_volume:
@@ -555,6 +565,22 @@ def generate_chart(asset_name, asset_config, tf_name, tf_config):
 
         # ---- Generate chart ----
         fig, axes = mpf.plot(df, **plot_kwargs)
+
+        # ---- Post-render: Fix RSI Y-axis ----
+        # Force RSI panel to show 0-100 scale
+        rsi_ax_idx = (rsi_panel * 2) if show_volume else (rsi_panel * 2)
+        for ax in axes:
+            if hasattr(ax, 'get_ylabel') and 'RSI' in str(ax.get_ylabel()):
+                ax.set_ylim(0, 100)
+                ax.set_yticks([20, 30, 50, 70, 80])
+                break
+        else:
+            # Fallback: last axis is usually RSI
+            try:
+                axes[-2].set_ylim(0, 100)
+                axes[-2].set_yticks([20, 30, 50, 70, 80])
+            except (IndexError, Exception):
+                pass
 
         # ---- Post-render annotations ----
 

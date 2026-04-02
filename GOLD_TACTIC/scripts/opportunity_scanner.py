@@ -33,10 +33,16 @@ if sys.platform == 'win32':
 OUTPUT_DIR = Path(__file__).parent.parent
 OPPORTUNITIES_FILE = OUTPUT_DIR / "opportunities.json"
 
+from dotenv import load_dotenv
+env_path = Path(__file__).parent.parent.parent / ".env"
+if env_path.exists():
+    load_dotenv(env_path)
+
 # Telegram
-TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN',
-    '8621254551:AAF3z5R-5JrAzTKaZQ31E3pmXxtlvQ10wFc')
-TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID', '-1003767339297')
+TELEGRAM_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
+TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHANNEL')
+if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
+    raise ValueError("TELEGRAM_BOT_TOKEN and TELEGRAM_CHANNEL must be set in .env")
 
 # Assets to scan
 SCAN_ASSETS = {

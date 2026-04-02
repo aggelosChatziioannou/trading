@@ -30,6 +30,7 @@ data/processed/
 !GOLD_TACTIC/data/trade_history.json
 !GOLD_TACTIC/data/opportunities.json
 !GOLD_TACTIC/data/scanner_watchlist.json
+!GOLD_TACTIC/data/narrative_memory.json
 !GOLD_TACTIC/data/research_notes.md
 !GOLD_TACTIC/data/trade_journal.md
 !GOLD_TACTIC/screenshots/charts_meta.json

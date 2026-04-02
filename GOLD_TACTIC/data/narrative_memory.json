@@ -1,0 +1,12 @@
+{
+  "last_updated": null,
+  "assets": {
+    "EURUSD":  { "arc": "WAITING", "arc_since_session": null, "wait_cycles_today": 0, "last_trs": null, "expected_trigger": null, "session_summary": null, "yesterday_summary": null },
+    "GBPUSD":  { "arc": "WAITING", "arc_since_session": null, "wait_cycles_today": 0, "last_trs": null, "expected_trigger": null, "session_summary": null, "yesterday_summary": null },
+    "NAS100":  { "arc": "WAITING", "arc_since_session": null, "wait_cycles_today": 0, "last_trs": null, "expected_trigger": null, "session_summary": null, "yesterday_summary": null },
+    "XAUUSD":  { "arc": "WAITING", "arc_since_session": null, "wait_cycles_today": 0, "last_trs": null, "expected_trigger": null, "session_summary": null, "yesterday_summary": null },
+    "BTC":     { "arc": "WAITING", "arc_since_session": null, "wait_cycles_today": 0, "last_trs": null, "expected_trigger": null, "session_summary": null, "yesterday_summary": null },
+    "SOL":     { "arc": "WAITING", "arc_since_session": null, "wait_cycles_today": 0, "last_trs": null, "expected_trigger": null, "session_summary": null, "yesterday_summary": null },
+    "ETH":     { "arc": "WAITING", "arc_since_session": null, "wait_cycles_today": 0, "last_trs": null, "expected_trigger": null, "session_summary": null, "yesterday_summary": null }
+  }
+}

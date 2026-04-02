@@ -47,6 +47,8 @@ data\sentiment.json             → Sentiment indices (από sentiment.py)
 data\trade_journal.md           → Journal trades
 data\session_log.jsonl          → Κύκλοι ιστορικό
 data\narrative_memory.json      → Arc state + story history ανά asset (cross-session)
+data\news_digest.json           → Shown news IDs σήμερα + dedup state (cross-session)
+data\telegram_log.json          → Message IDs για daily cleanup (operational)
 ```
 
 ---

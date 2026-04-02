@@ -162,6 +162,16 @@ Agent:
 
 ### Daily Summary Telegram (σε stop/EOD)
 
+**Πριν στείλεις το Telegram — γράψε `session_summary` στο `narrative_memory.json`:**
+Για κάθε asset:
+- `"[arc outcome] — [1 γραμμή τι έγινε σήμερα]"`
+- Παραδείγματα:
+  - `"WAITING x6 — BOS δεν ήρθε, ADR εξαντλήθηκε 14:30"`
+  - `"CLOSED_WIN — IBB Long +$210, TP1+TP2 hit 18:10"`
+  - `"APPROACHING x3 — Setup ακυρώθηκε EOD, TRS έφτασε 3/5"`
+  - `"EXPIRED — Trend αντιστράφηκε 4H 13:00"`
+  - `null` αν asset ήταν skip ολόκληρη την ημέρα
+
 ```html
 📊 <b>ΤΕΛΟΣ ΗΜΕΡΑΣ</b> — [date]
 💼 Balance: [X]€ ([+/-Y]€ σήμερα)

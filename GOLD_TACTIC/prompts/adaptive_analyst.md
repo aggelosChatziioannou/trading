@@ -1113,36 +1113,33 @@ Format:
 
 ---
 
-## TELEGRAM FORMAT
+## TELEGRAM CARD SYSTEM
 
-Όλα τα μηνύματα σε HTML parse mode. Χρησιμοποίησε `<b>` για headers.
-**ΓΛΩΣΣΑ:** Εξήγηση πρώτα σε απλά ελληνικά, τεχνικά νούμερα σε παρένθεση αν χρειάζονται.
+Αντί για μεγάλα μηνύματα, στέλνεις **μικρά focused cards** — κάθε card = 1 θέμα, χωράει σε 1 οθόνη κινητού.
+Χρησιμοποίησε HTML parse mode. `<b>` για headers.
+**ΓΛΩΣΣΑ:** Απλά ελληνικά πρώτα, τεχνικά νούμερα σε παρένθεση.
+**ΑΡΧΗ:** Πες ΤΙ ΑΛΛΑΞΕ, ΟΧΙ τι είναι. Διάβασε `data\last_telegram_state.json` ΠΡΙΝ στείλεις.
 
-### TIER 1 — Smart Pulse (DELTA-BASED)
+### 📊 STATUS CARD (κάθε 30' — ΠΑΝΤΑ)
 
-**ΑΡΧΗ:** Πες μου ΤΙ ΑΛΛΑΞΕ, όχι τι είναι. Διάβασε last_telegram_state.json ΠΡΙΝ στείλεις.
+**Σκοπός:** "Το bot ζει. Αυτή είναι η εικόνα." Max 5 γραμμές.
 
-**Αν ΤΙΠΟΤΑ δεν κινήθηκε σημαντικά (< thresholds) →** compact 2-γραμμο:
 ```html
-⚡ [HH:MM] — Σταθερή αγορά
-📍 EUR [+/-Xp] | BTC [+/-$X] | NAS [+/-Xpts] (τελ. [Y]')
-→ Επόμενο σε [Y]'
+📊 [HH:MM] | 💼 [X]€ | [X]/3 trades
+📍 EUR [+/-Xp] | BTC [+/-$X] | NAS [+/-Xpts]
+🎯 Κοντά σε trade: [proximity summary ή "κανένα"]
+💰 Drawdown: [level]
+→ [HH:MM]
 ```
 
-**Αν κάτι κινήθηκε ΣΗΜΑΝΤΙΚα →** μόνο αυτό:
-```html
-⚡ [HH:MM] — Κίνηση!
-📍 EURUSD [+25p] (1.0845→1.0870) ⚠️
-[αν arc άλλαξε:] 📖 EURUSD: WAITING→APPROACHING
-[αν HIGH νέο:] 📰 "[τίτλος]" — [1 γραμμή]
-→ Escalate: TIER 2 σε 10'
-```
-
-**Κανόνες TIER 1 (ΥΠΟΧΡΕΩΤΙΚΟΙ):**
-- Balance: ΜΟΝΟ αν άλλαξε (trade open/close). Αν ίδιο → ΜΗΝ το γράψεις.
-- Τιμές: ΜΟΝΟ σαν deltas (+Xp, -$X), ΟΧΙ absolute τιμές.
-- Ανοιχτά trades: ΜΟΝΟ αν P&L άλλαξε > 10 pips. Αν σταθερό → skip.
-- Max μήκος: 4 γραμμές. Αν χρειάζονται περισσότερες → escalate TIER.
+**Κανόνες:**
+- Γραμμή 1: Ώρα + balance + ανοιχτά (balance ΜΟΝΟ αν άλλαξε)
+- Γραμμή 2: Price deltas ΜΟΝΟ (+Xp, -$X), ΟΧΙ absolute τιμές
+- Γραμμή 3: **🎯 PROXIMITY SUMMARY** — ποια assets κοντά σε trade + εκτίμηση χρόνου
+  - Διάβασε trs_scores.json → `get_proximity_summary()` → π.χ. "EURUSD (TRS 4/5 — ~30')"
+  - Αν κανένα TRS ≥ 3: "κανένα"
+- Γραμμή 4: Drawdown (ΜΟΝΟ αν ΟΧΙ SAFE)
+- Γραμμή 5: Επόμενη ενημέρωση
 
 **Movement thresholds (κάτω = "σταθερό"):**
 | Asset | Σταθερό | Σημαντικό |
@@ -1153,263 +1150,159 @@ Format:
 | BTC | < $150 | ≥ $500 |
 | SOL | < $0.50 | ≥ $1.50 |
 
-### TIER 2 — Context Update (DELTA-BASED)
+### 🎯 ASSET CARD (per asset — ΜΟΝΟ αν ΑΛΛΑΞΕ)
 
-**ΑΡΧΗ:** Δείξε ΜΟΝΟ τα assets που ΑΛΛΑΞΑΝ. Αν ένα asset είναι σταθερό → 1 γραμμή max.
-
-```html
-📊 [HH:MM] — ΑΛΛΑΓΕΣ (vs [ΩΡΑ τελ. μηνύματος])
-
-[ΓΙΑ ΚΑΘΕ asset που ΑΛΛΑΞΕ (τιμή ≥ threshold Ή TRS άλλαξε Ή arc άλλαξε):]
-🔄 <b>[ASSET]</b>: TRS [πριν]→[τώρα], [+/-X pips]
-   [Narrative escalation βάσει wait_cycles:]
-   Κύκλος 1-2: "Αναμένω [trigger]"
-   Κύκλος 3-4: "[X]ος κύκλος — τιμή [Y pips] μακριά"
-   Κύκλος 5-6: "⚠️ [X]ος κύκλος — αρχίζει να αργεί"
-   Κύκλος 7+: "❌ [X]ος κύκλος — setup πιθανά ακυρώνεται"
-   APPROACHING: "Πλησιάζει! TRS [X]→[Y], λείπει μόνο [❌]"
-   EXPIRED: "Ακυρώθηκε — [λόγος]" (1 φορά, μετά σιωπή)
-
-[ΓΙΑ assets ΣΤΑΘΕΡΑ (τίποτα δεν άλλαξε):]
-📌 [ASSET1], [ASSET2]: σταθερά, τίποτα νέο
-
-[ΜΟΝΟ αν υπάρχει ΝΕΟ high-impact news (μετά last_sent_at):]
-🆕 [headline] — [1 γραμμή impact]
-
-[ΜΟΝΟ αν balance ΑΛΛΑΞΕ:]
-💼 [old]€→[new]€ ([+/-X]€)
-
-→ Επόμενο: TIER [X] σε [Y]'
-```
-
-**Κανόνες TIER 2 (ΥΠΟΧΡΕΩΤΙΚΟΙ):**
-- Header λέει "ΑΛΛΑΓΕΣ vs [ώρα]" — ΟΧΙ "QUICK CHECK"
-- Per asset: ΑΝ τίποτα δεν άλλαξε → 1 γραμμή "[ASSET]: σταθερό"
-- ΑΝ ΟΛΑ τα assets σταθερά → compact: "Τίποτα νέο στην αγορά. Επόμενο σε [Y]'"
-- News: ΜΟΝΟ νέα articles (μετά last_sent_at), ΟΧΙ repeat παλιών
-- Balance: ΜΟΝΟ αν αλλαξε. Αλλιώς → SKIP.
-- Wait cycle: ΑΛΛΑΖΕΙ μήνυμα κάθε 2 κύκλους (escalation, ΟΧΙ repeat)
-- Max: 15 γραμμές. Αν χρειάζονται περισσότερες → TIER 3a.
-
-### TIER 3 — Full Analysis (ΠΑΝΤΑ)
-
-#### HEADER (ΠΑΝΤΑ πρώτο)
+**Σκοπός:** "Αυτό το asset κινήθηκε. Πλησιάζει trade;" Max 8 γραμμές.
+**Στέλνεται:** Μόνο αν TRS άλλαξε, ή τιμή ≥ significant threshold, ή arc άλλαξε.
+**ΑΝ asset σταθερό →** ΔΕΝ στέλνεται card (εμφανίζεται μόνο στο Status Card).
 
 ```html
-📊 <b>GOLD TACTIC ANALYST</b> — [ΩΩ:ΛΛ] EET 🇬🇷
-🌊 Regime: [TRENDING/RANGING/CHOPPY] (ADX: [X])
-💼 [X]€ | 📊 [X]W-[Y]L ([Z]%) | 🎯 Ρίσκο/trade: [X]€
-⚠️ Max σήμερα: -[X]€ | Χρησιμοποιημένο: [X]€ ([Y]%)
-🔥 Streak: [X] [νίκες/ζημιές] | Σήμερα: [+/-X]€
-[αν weekend:] 🏖️ Σαββατοκύριακο — μόνο crypto
-[αν single source:] ⚠️ Μία μόνο πηγή τιμών (μπορεί να μην είναι 100% ακριβείς)
-[αν πρώτο μήνυμα ημέρας:] 📖 ✅=πληρείται ❌=λείπει 🚫=block ⚡=απόφαση
-━━━━━━━━━━━━━━━━━━━━━━
+🎯 <b>[ASSET]</b> — TRS [πριν]→[τώρα] [⬆️/⬇️/➡️]
+
+📍 [τιμή] ([+/-X] vs τελ.) | ADR: [X]%
+📖 [Narrative escalation βάσει wait_cycles:]
+   ❌ [Τι λείπει σε plain Greek]
+
+⏱️ Εκτίμηση: [~15-30' / ~1-2h / Δεν βλέπω σύντομα]
+🔥 Αν [trigger condition] → TRADE [LONG/SHORT]
+[proximity_bar] — π.χ. [▓▓▓▓▓▓▓▓░░] 80% — σχεδόν εκεί!
 ```
 
-#### 🔄 ZONE "ΤΙ ΑΛΛΑΞΕ"
+**Narrative Escalation (wait_cycles — ΑΛΛΑΖΕΙ κάθε 2 κύκλους):**
+
+| Κύκλος | Μήνυμα |
+|--------|--------|
+| 1-2 | "Αναμένω [trigger]" |
+| 3-4 | "[N]ος κύκλος — τιμή [X pips] μακριά" |
+| 5-6 | "⚠️ [N]ος κύκλος — αρχίζει να αργεί" |
+| 7+ | "❌ [N]ος κύκλος — setup πιθανά ακυρώνεται" |
+
+**Expired Asset (τελευταίο card, μετά σιωπή):**
+```html
+❌ <b>[ASSET]</b> — Ακυρώθηκε
+📖 [λόγος — π.χ. ADR 92%, δεν υπάρχει χώρος]
+→ Δεν ξαναστέλνω μέχρι νέο scanner
+```
+
+### 📰 NEWS CARD (ΜΟΝΟ σε HIGH impact news)
+
+**Σκοπός:** "Νέο → τι σημαίνει για τα assets σου." Max 6 γραμμές.
+**Στέλνεται:** Αμέσως μόλις εντοπιστεί HIGH impact news.
 
 ```html
-🔄 <b>ΤΙ ΑΛΛΑΞΕ</b> (vs [ΩΩ:ΛΛ]):
-• EURUSD: [+/-X] pips ([τιμή πριν]→[τιμή τώρα]), TRS [πριν]→[τώρα]
-• BTC: [+/-X] pips, TRS [πριν]→[τώρα]
-• Νέα: [Νέο news / Κανένα νέο]
-• Trade: [Κανένα / EURUSD SHORT +X pips / Νέο trade ανοιχτό]
-→ Εκτίμηση: [1 γραμμή — "EURUSD πλησιάζει trigger" / "αγορά αδρανής"]
+📰 <b>[headline σε 60 chars]</b> ([πηγή])
+
+→ [ASSET1] [⬆️/⬇️] [+/-Xp] | [ASSET2] [⬆️/⬇️] [+/-$X]
+→ [1 γραμμή plain Greek εξήγηση]
+
+💡 [Action alert — π.χ. "Αν SHORT EUR → ΠΡΟΣΟΧΗ"]
+⚡ [Αν TRS ≥ 4 → πιθανό trigger!]
 ```
 
-Αν πρώτος κύκλος ημέρας:
-```html
-🔄 Πρώτος κύκλος ημέρας — baseline τιμές.
-```
+**Κανόνες News Card:**
+- Γραμμή 2: **ASSET IMPACT FIRST** — δείξε κατεύθυνση ΑΝΑ asset αμέσως
+- ΟΧΙ μαθήματα, ΟΧΙ εκτενή analysis — μόνο impact
+- MEDIUM/LOW news: αναφέρονται μόνο στο Status Card, ΟΧΙ ξεχωριστό card
 
-#### 🚨 ZONE 0 — ΕΚΤΑΚΤΗ ΕΝΕΡΓΟΠΟΙΗΣΗ
+### 🔴 TRADE CARD (ΜΟΝΟ αν ανοιχτό trade)
 
-```html
-🚨 <b>ΕΚΤΑΚΤΗ ΕΝΕΡΓΟΠΟΙΗΣΗ — [ASSET]</b>
-
-📰 "[τίτλος νέου]" ([πηγή], [ΩΡΑ EET])
-   → <a href="[url]">Διάβασε</a>
-🧠 Γιατί: [2 προτάσεις σε απλά ελληνικά — κατεύθυνση + τι το προκάλεσε]
-📈 Κατεύθυνση: [ΑΓΟΡΑ/ΠΩΛΗΣΗ] — [1 γραμμή περίληψη]
-⚠️ Ο Scanner είχε αφήσει [ASSET] εκτός — αυτό το νέο αλλάζει εικόνα
-
-→ Κάνω πλήρη ανάλυση τώρα...
-```
-
-#### 🔴 ZONE 1 — ΑΝΟΙΧΤΟ TRADE
+**Σκοπός:** "Πώς πάει το trade σου." Max 8 γραμμές.
+**Στέλνεται:** Κάθε 30' ενώ trade ανοιχτό, ή αν P&L > 10 pips αλλαγή, ή αν κοντά σε TP/SL.
 
 ```html
-🔴 <b>TRADE ΑΝΟΙΧΤΟ — [ASSET] [ΑΓΟΡΑ/ΠΩΛΗΣΗ]</b>
-📍 Μπήκα: [entry] → Τώρα: [current] ([+/- pips/points]) [✅ κερδίζουμε / ⚠️ οριακά / ❌ ζημιά]
-🎯 Στόχος 1: [tp1] ([X% εκεί]) | Στόχος 2: [tp2]
-🛡️ Stop: [sl] ([εξήγηση — π.χ. "μηδέν ρίσκο", "αρχικό", "κλειδωμένα +33€"])
+🔴 <b>[ASSET] [LONG/SHORT]</b> — [+/-Xp] [✅/⚠️/❌]
 
-📊 ΕΞΕΛΙΞΗ TRADE:
-├ Προηγούμενος κύκλος: [τιμή] ([+/- pips])
-├ Τώρα: [τιμή] ([+/- pips])
-├ Αλλαγή: [+/- X pips] [📈 ΒΕΛΤΙΩΝΕΤΑΙ / 📉 ΧΕΙΡΟΤΕΡΕΥΕΙ / ➡️ ΣΤΑΘΕΡΟ]
-└ Πρόοδος προς Στόχο 1: [X]% (ήταν [Y]%)
+📍 Entry: [entry] → Τώρα: [current]
+🎯 TP1: [tp1] [████░░░░░░] [X]%
+🛡️ SL: [sl] ([εξήγηση])
+💰 P&L: [+/-X]€ | Ρίσκο: [X]€
 
-💡 Συμπέρασμα: [1-2 προτάσεις — αξιολόγηση κίνησης]
-
-📰 Νέα & trade: [1-2 προτάσεις — πώς τα τρέχοντα νέα επηρεάζουν το trade μας]
-
-🔔 Exit Intelligence:
-├ ⚡ [exhaustion signal αν υπάρχει]
-└ Ενέργεια: [trailing tightened / κανένα signal]
-
-⏱️ Εκτίμηση: ~[X]-[Y] ώρες μέχρι TP1
+⏱️ Εκτίμηση TP1: [~30-60']
+💡 [1 γραμμή — ΚΡΑΤΑΜΕ / ΚΛΕΙΣΕ / ΠΡΟΣΟΧΗ]
 ```
 
-#### 🟡 ZONE 2 — ΠΑΡΑΚΟΛΟΥΘΗΣΗ
+**TP1 Hit Card:**
+```html
+🎉 <b>[ASSET]</b> — TP1 HIT! [+Xp]
+📍 [entry]→[tp1] | Κλείσαμε 50%
+💰 [+X]€ κλειδωμένα! 🛡️ SL → Breakeven
+→ Runner: 50% τρέχει → TP2 [tp2]
+```
+
+### 📋 SCANNER CARD (2x/day — 08:00 + 15:30)
+
+**Σκοπός:** "Σημερινό game plan." Max 20 γραμμές.
+
+**Πρωινός Scanner:**
+```html
+🔍 <b>SCANNER ΠΡΩΙΝΟΣ</b> — [Ημέρα] [HH:MM]
+
+⭐ TOP: [ASSET] [DIR] (Score [X]/10)
+📈 [ASSET] [DIR] (Score [X]/10)
+📈 [ASSET] [DIR] (Score [X]/10)
+❌ [ASSET1], [ASSET2], [ASSET3]
+
+📅 [EVENT στις ΩΡΑ — προσοχή ASSETS]
+📊 Crypto Fear: [X] | Markets: [X]
+💲 DXY: [price] [BULL/BEAR] → EUR/GBP [⬆️/⬇️]
+
+💼 [X]€ | Streak: [X]W | Μήνας: [X]/[TARGET]€
+→ Πρώτος κύκλος σε 15'
+```
+
+**Απογευματινός Scanner:**
+```html
+🔍 <b>SCANNER 15:30</b> — ΑΛΛΑΓΕΣ
+🆕 [ASSET] ΕΝΕΡΓΟΠΟΙΗΘΗΚΕ ([λόγος])
+📈 [ASSET]: παραμένει ✅ (ADR [X]%)
+📉 [ASSET]: αδύναμο (ADR [X]%)
+→ Πρώτος NY κύκλος σε 15'
+```
+
+### CARD DISPATCH RULES
+
+| Κατάσταση | Cards | Max msgs |
+|-----------|-------|----------|
+| Τίποτα δεν γίνεται (30') | Status Card μόνο | 1 |
+| Trade ανοιχτό (30') | Status + Trade Card | 2 |
+| Asset άλλαξε | Status + Asset Card(s) | 3 max |
+| Breaking HIGH news | News Card (ΑΜΕΣΑ) | 1 |
+| Scanner (2x/day) | Scanner Card | 1 |
+| Trade opened | Trade Card | 1 |
+| Trade closed | Trade close Card | 1 |
+
+**Σειρά αποστολής (πολλαπλά cards):**
+1. 📰 News Card (breaking = urgent first)
+2. 🔴 Trade Card (P&L important)
+3. 🎯 Asset Cards (opportunities)
+4. 📊 Status Card (summary, τελευταίο)
+
+### TIER 3 ZONES → ΑΝΤΙΚΑΤΑΣΤΑΘΗΚΑΝ ΑΠΟ CARDS
+
+**ΔΕΝ στέλνεις πια μεγάλα TIER 3 μηνύματα.** Αντ' αυτού:
+- Τρέξε την ανάλυση κανονικά (steps 1-18)
+- Στο step 13: στείλε **ξεχωριστά Cards** βάσει του CARD DISPATCH RULES πίνακα παραπάνω
+- Κάθε card χωράει σε 1 οθόνη κινητού
+- ��ν ανοιχτό trade → Trade Card. Αν asset άλλαξε → Asset Card. Πάντα → Status Card.
+
+**Ό,τι ήταν Zone 0 (Emergency) →** News Card + Asset Card αμέσως
+**Ό,τι ήταν Zone 1 (Trade) →** Trade Card
+**Ό,τι ήταν Zone 2 (Monitoring) →** Asset Card (ΜΟΝΟ αν άλλαξε)
+**Ό,τι ήταν Zone 3 (News) →** News Card (ΜΟΝΟ HIGH impact)
+**Ό,τι ήταν Zone 4 (Session Preview) →** Scanner Card ή Status Card
+
+### EOD Summary Card
 
 ```html
-🟡 <b>ΠΑΡΑΚΟΛΟΥΘΗΣΗ</b> (DELTA-BASED — μόνο assets που ΑΛΛΑΞΑΝ)
-━━━━━━━━━━━━━━━━━━━━━━
-
-**ΚΑΝΟΝΑΣ ZONE 2:** Δείξε ΠΛΗΡΗ ανάλυση ΜΟΝΟ για assets όπου:
-- Τιμή κινήθηκε ≥ significant threshold, Ή
-- TRS άλλαξε, Ή arc άλλαξε, Ή
-- Έχει ανοιχτό trade
-
-**Αν asset ΣΤΑΘΕΡΟ (τίποτα δεν άλλαξε):** 1 γραμμή max:
-`📌 [ASSET]: σταθερό (TRS [X]/5, [+/-Xp]) — τίποτα νέο`
-
-**Αν asset ΑΛΛΑΞΕ →** πλήρης ανάλυση:
-
-📉/📈 <b>[ASSET]</b> — [τιμή] ([+/-X] vs τελ.) — Ετοιμότητα [X]/5 [emoji]
-
-📖 <b>CONTEXT:</b> [Narrative escalation — ΑΛΛΑΖΕΙ κάθε 2 κύκλους:
-   • Κύκλος 1-2: "Αναμένω [trigger]."
-   • Κύκλος 3-4: "[X]ος κύκλος — τιμή [Y] μακριά, δεν κινήθηκε."
-   • Κύκλος 5-6: "⚠️ [X]ος κύκλος — αρχίζει να αργεί."
-   • Κύκλος 7+: "❌ [X]ος κύκλος — setup πιθανά ακυρώνεται."
-   • APPROACHING: "Πλησιάζει! TRS [X]→[Y] — λείπει μόνο [❌ κριτήριο]."
-   • Αν yesterday_summary: "Χθες: [yesterday_summary]. Σήμερα [τι διαφέρει — ADR, RSI, news]."
-]
-
-📊 Alignment:
-├ Daily:  [BULL/BEAR] [↑/↓]
-├ 4H:    [BULL/BEAR] [↑/↓]
-├ 1H:    [BULL/BEAR] [↑/↓]  → [FULL ALIGNMENT ✅ / PARTIAL ⚠️ / CONFLICT ❌]
-└ 15min: [⏳ Περιμένω BOS / ✅ BOS confirmed]
-
-[ΠΡΩΤΑ τα ✅ — αυτά που ΗΔΗ πληρούνται]
-  ✅ [Εξήγηση σε απλά ελληνικά]
-  ✅ [...]
-
-[ΜΕΤΑ τα ❌ — αυτά που ΔΕΝ έχουν γίνει ακόμα]
-  ❌ [π.χ. "Η τιμή δεν έχει κάνει ακόμα παγίδα"]
-
-[ΑΝ κάτι ΜΠΛΟΚΑΡΕΙ:]
-  🚫 [π.χ. "Παρά το 4/5, δεν μπαίνω — βγήκε NFP σε 12 λεπτά"]
-
-  ⚡ ΑΠΟΦΑΣΗ: [ΑΝΑΜΟΝΗ / ΕΤΟΙΜΟΤΗΤΑ / ΜΠΑΙΝΟΥΜΕ / ΚΡΑΤΑΜΕ] — [1 γραμμή λόγος]
-
-  🎯 PROXIMITY: [▓▓▓▓▓▓▓▓░░] [X]% — [σχεδόν εκεί! / μισός δρόμος / μακριά ακόμα]
-  📏 ΑΠΟΣΤΑΣΗ ΑΠΟ TRADE:
-  ├ Τιμή τώρα: [X] | Trigger: [Y] | Απόσταση: [Z pips]
-  ├ Τι λείπει: [μόνο τα ❌ κριτήρια]
-  └ Εκτίμηση: [ΚΟΝΤΑ (1-2 κύκλοι) / ΜΕΤΡΙΑ (ώρες) / ΜΑΚΡΙΑ (αύριο/ποτέ)]
-
-  ⏭️ ΕΠΟΜΕΝΟ ΒΗΜΑ: [τι ακριβώς περιμένω]
-
-━━━━━━━━━━━━━━━━━━━━━━
-[επανάλαβε για κάθε active asset]
-
-[ΑΝ ΟΛΑ τα assets Ετοιμότητα ≤ 2:]
-💤 <b>ΗΡΕΜΗ ΑΓΟΡΑ</b> — Γιατί δεν κάνω trade:
-• [ASSET]: [setup δεν ολοκληρώθηκε] ([X]/5)
-→ Αυτό είναι ΘΕΤΙΚΟ. Η υπομονή φέρνει κέρδη.
-
-❌ <b>Εκτός σήμερα:</b>
-├ [ASSET] — [λόγος σε απλά ελληνικά]
-└ [ASSET] — [λόγος σε απλά ελληνικά]
+📊 <b>ΤΕΛΟΣ ΗΜΕΡΑΣ</b> — [date]
+💼 Balance: [X]€ ([+/-Y]€ σήμερα)
+📈 Trades: [N] WIN, [N] LOSS
+📊 Κύκλοι: [N] (Status:[X] Asset:[Y] News:[Z] Trade:[W])
+📅 Μήνας: [████░░░░░░] [X]/[TARGET]€
+→ Αύριο scanner στις 08:00
 ```
 
-#### ⚪ ZONE 3 — ΕΙΔΗΣΕΙΣ
-
-```html
-📰 <b>ΝΕΑ</b> (vs [last_cycle_time] EET)
-
-[📌 escalation αν ισχύουν και τα 3 κριτήρια — εμφανίζεται ΠΡΩΤΟ]
-📌 Νέο [ΩΩ:ΛΛ] επιβεβαιώνεται — "[τίτλος αρχικού νέου]"
-   → [τιμή] κινήθηκε [+X pips] σύμφωνα με [BULLISH/BEARISH call]
-
-[Νέα άρθρα — ΟΧΙ στο shown_ids — ταξινομημένα HIGH → MEDIUM → LOW]
-🔴 "[τίτλος]" ([πηγή], [ΩΩ:ΛΛ])
-   → [1-line Greek conclusion] [🟢/🔴 per active asset]
-   → <a href="[url]">Διάβασε</a>   [παράλειψε αυτή τη γραμμή αν δεν υπάρχει url]
-
-🟡 "[τίτλος]" ([πηγή], [ΩΩ:ΛΛ])
-   → [1-line Greek conclusion]
-   [χωρίς link αν δεν υπάρχει url]
-
-[⚪ LOW παραλείπονται αν υπάρχουν HIGH ή MEDIUM]
-[Αν ΟΛΑ τα άρθρα στο shown_ids:]
-📰 Καμία νέα είδηση από [last_updated]. Κλίμα: [1 γραμμή sentiment]
-
-📊 Sentiment: Crypto Fear [X] | Markets [X]
-📅 Επόμενο event: [EVENT] σε [Xh] ([HIGH/MEDIUM])
-```
-
-**Κανόνες:**
-- Χρησιμοποίησε `shown_ids` από `news_digest.json` για dedup (όχι timestamps)
-- Sorting: 🔴 HIGH → 🟡 MEDIUM → ⚪ LOW
-- ⚪ LOW εμφανίζονται ΜΟΝΟ αν δεν υπάρχουν HIGH/MEDIUM νέα
-- Link rule: αν `url` κενό ή απόν → παράλειψε τη γραμμή `→ <a href>`
-- Κάθε εμφανιζόμενο άρθρο ΠΡΕΠΕΙ να έχει 1-line conclusion (αλλιώς παράλειψε)
-
-#### 📋 ZONE 4 — SESSION PREVIEW (σε transition points + EOD)
-
-**~10:45-11:00 EET (τέλος London Killzone):**
-```html
-📋 <b>LONDON ΤΕΛΕΙΩΣΕ:</b>
-• Αποτέλεσμα: [trade/shadow/τίποτα]
-• Midday (11:00-15:30): [τι παρακολουθώ]
-• NY Preview (16:30+): [τι ψάχνω]
-```
-
-**~15:30-15:45 EET (πριν NY open):**
-```html
-📋 <b>NY SESSION ΞΕΚΙΝΑ:</b>
-• Scanner afternoon: [τι άλλαξε — νέα assets, NAS100 status]
-• IBB window: 16:30-17:30 EET — [τι ψάχνω]
-• Open trades: [status]
-```
-
-**~21:30 EET (EOD):**
-```html
-📋 <b>ΠΡΟΕΤΟΙΜΑΣΙΑ [ΑΥΡΙΟ]:</b>
-• [ASSET]: [κρίσιμο level + τι κάνω αν σπάσει]
-• [Αν major news αύριο:] ⚠️ [EVENT] στις [ΩΡΑ]
-```
-
-#### FOOTER (πάντα στο τέλος TIER 3)
-
-```html
-[αν cleanup:] 🧹 Emergency καθαρίστηκε: [ASSET]
-[αν emergency cap:] ⚠️ Emergency cap (2/2) — [headline] σημειώθηκε αλλά δεν ενεργοποιήθηκε
-
-[ΜΟΝΟ αν balance ΑΛΛΑΞΕ vs τελευταίο μήνυμα:]
-💼 Πορτοφόλι: [old]€→[new]€ ([+/-X]€) | Ανοιχτά: [X]/3
-
-[ΜΟΝΟ αν trade ανοίχτηκε/έκλεισε ΑΥΤΟΝ τον κύκλο:]
-📊 Συνολικά: [X] trades, [X] νίκες ([X]%) | [+/-X]€ από αρχή
-🔥 Streak: [X] συνεχόμενες [νίκες/ζημιές]
-
-[ΠΑΝΤΑ:]
-📅 Μήνας: [████░░░░░░] [X]/[TARGET]€ ([Y]%)
-→ Επόμενος: TIER [X] σε [Y] λεπτά ([HH:MM])
-
-[ΑΝ εντός 60 λεπτών από EOD (21:40 weekday / 19:40 ΣΚ):]
-⏰ [XX] λεπτά μέχρι auto-close ([21:40/19:40])
-[ΑΝ υπάρχει ανοιχτό trade:] → Σκέψου manual close αν P&L αρνητικό.
-
-[ΑΝ drawdown CAUTION/DANGER/BLOCKED:]
-💰 Drawdown: [level] — [drawdown_pct]% / Daily: [daily_loss_pct]%
-```
+**Τα παλιά TIER 3 Zones (0-4) αντικαταστάθηκαν πλήρως από τα Cards.**
 
 ---
 

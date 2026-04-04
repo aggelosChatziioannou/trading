@@ -406,6 +406,115 @@ def check_correlation_blocks(trs_results, correlation_data, open_trades):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# PROXIMITY & TIME ESTIMATION (Card System)
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Pip sizes per asset (for trigger distance calculation)
+ASSET_PIP_SIZES = {
+    "EURUSD": 0.0001, "GBPUSD": 0.0001, "XAUUSD": 0.01,
+    "NAS100": 1.0, "BTC": 1.0, "SOL": 0.01, "ETH": 1.0,
+}
+
+
+def compute_proximity_score(trs_score, asset_data, adr_gate, correlation_block):
+    """
+    Υπολογίζει πόσο κοντά είμαστε σε trade (0-100%).
+
+    Base = (TRS/5) * 100
+    Modifiers: ADR, regime, correlation, trigger distance
+
+    Returns: int (0-100)
+    """
+    if adr_gate.get("blocked"):
+        return 0
+    if correlation_block:
+        return 0
+
+    base = (trs_score / 5) * 100
+
+    # ADR penalty
+    adr_pct = asset_data.get("adr_consumed_pct") or 0
+    regime = asset_data.get("regime", "UNKNOWN")
+    if adr_pct > 85 and regime != "TRENDING":
+        base -= 20
+
+    # Choppy penalty
+    if regime == "CHOPPY":
+        base -= 30
+
+    # Trigger proximity bonus (price near PDH/PDL)
+    price = asset_data.get("price")
+    pdh = asset_data.get("pdh")
+    pdl = asset_data.get("pdl")
+    if price and pdh and pdl:
+        range_size = pdh - pdl
+        if range_size > 0:
+            dist_to_trigger = min(abs(price - pdh), abs(price - pdl))
+            proximity_ratio = dist_to_trigger / range_size
+            if proximity_ratio < 0.15:
+                base += 10  # Very close to sweep level
+
+    return max(0, min(100, int(base)))
+
+
+def estimate_trade_time(trs_score, asset_name, asset_data):
+    """
+    Εκτιμά πόσο χρόνο μέχρι πιθανό trade.
+
+    Returns: str ή None (αν δεν αξίζει να δείξουμε)
+    """
+    if trs_score >= 5:
+        return "ΤΩΡΑ — trade ready!"
+
+    if trs_score == 4:
+        # Υπολόγισε απόσταση σε pips από trigger
+        price = asset_data.get("price")
+        pdh = asset_data.get("pdh")
+        pdl = asset_data.get("pdl")
+        pip_size = ASSET_PIP_SIZES.get(asset_name, 0.0001)
+
+        if price and pdh and pdl and pip_size > 0:
+            dist = min(abs(price - pdh), abs(price - pdl))
+            pips = dist / pip_size
+            if pips < 10:
+                return "~15-30 λεπτά"
+        return "~30-60 λεπτά"
+
+    if trs_score == 3:
+        if asset_data.get("regime") == "TRENDING":
+            return "~1-2 ώρες"
+        return "~2-4 ώρες (αν κινηθεί)"
+
+    if trs_score == 2:
+        return "Δεν βλέπω σύντομα"
+
+    return None  # TRS 0-1: don't show
+
+
+def format_proximity_bar(pct):
+    """
+    Δημιουργεί visual progress bar για proximity.
+
+    Returns: str "[▓▓▓▓▓░░░░░] 50% — μισός δρόμος"
+    """
+    filled = max(0, min(10, round(pct / 10)))
+    bar = "\u2593" * filled + "\u2591" * (10 - filled)
+
+    if pct >= 80:
+        label = "σχεδόν εκεί!"
+    elif pct >= 60:
+        label = "πλησιάζει"
+    elif pct >= 40:
+        label = "μισός δρόμος"
+    elif pct >= 20:
+        label = "νωρίς"
+    else:
+        label = "μακριά"
+
+    return f"[{bar}] {pct}% \u2014 {label}"
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # MAIN TRS CALCULATOR
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -453,12 +562,20 @@ def calculate_trs(asset_name, asset_data, news_data):
     # ADR Gate (hard cutoff)
     adr_gate = check_adr_gate(asset_data)
 
+    # Proximity & Time estimation (Card System)
+    proximity = compute_proximity_score(met_count, asset_data, adr_gate, False)
+    proximity_bar = format_proximity_bar(proximity)
+    time_est = estimate_trade_time(met_count, asset_name, asset_data)
+
     return {
         "trs_score": met_count,
         "direction": direction,
         "criteria": criteria,
         "met_count": met_count,
         "adr_gate": adr_gate,
+        "proximity_score": proximity,
+        "proximity_bar": proximity_bar,
+        "estimated_time": time_est,
     }
 
 
@@ -602,6 +719,15 @@ def main():
                 print(f"   🚫 ADR: {result['adr_gate']['reason']}")
             if corr_blocked:
                 print(f"   🔗 CORR: {result['correlation_info']['reason']}")
+
+            # Proximity & Time
+            prox = result.get("proximity_score", 0)
+            prox_bar = result.get("proximity_bar", "")
+            time_est = result.get("estimated_time")
+            if prox_bar:
+                print(f"   {prox_bar}")
+            if time_est:
+                print(f"   ⏱️ {time_est}")
 
         print("\n" + "=" * 80)
 

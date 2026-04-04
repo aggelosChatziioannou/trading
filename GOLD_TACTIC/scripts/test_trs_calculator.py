@@ -21,6 +21,9 @@ from trs_calculator import (
     check_correlation_blocks,
     calculate_trs,
     _detect_headline_sentiment,
+    compute_proximity_score,
+    estimate_trade_time,
+    format_proximity_bar,
 )
 
 
@@ -273,6 +276,91 @@ def test_calculate_trs_mixed():
     print("  ✅ Mixed TRS Calculation (2/5) — PASS")
 
 
+def test_proximity_score():
+    """Test: Proximity score calculation."""
+    # TRS 5/5, no blocks → 100%
+    score = compute_proximity_score(5, {"adr_consumed_pct": 50, "regime": "TRENDING"}, {"blocked": False}, False)
+    assert score == 100, f"Expected 100, got {score}"
+
+    # TRS 0/5 → 0%
+    score = compute_proximity_score(0, {"adr_consumed_pct": 50, "regime": "RANGING"}, {"blocked": False}, False)
+    assert score == 0, f"Expected 0, got {score}"
+
+    # ADR blocked → 0%
+    score = compute_proximity_score(5, {}, {"blocked": True}, False)
+    assert score == 0
+
+    # Correlation blocked → 0%
+    score = compute_proximity_score(5, {}, {"blocked": False}, True)
+    assert score == 0
+
+    # CHOPPY regime penalty
+    score = compute_proximity_score(3, {"adr_consumed_pct": 50, "regime": "CHOPPY"}, {"blocked": False}, False)
+    assert score == 30, f"Expected 30 (60-30), got {score}"  # 60% base - 30% choppy
+
+    print("  ✅ Proximity Score — PASS")
+
+
+def test_time_estimation():
+    """Test: Trade time estimation."""
+    # TRS 5 → NOW
+    est = estimate_trade_time(5, "EURUSD", {})
+    assert "ΤΩΡΑ" in est
+
+    # TRS 4 with close trigger → 15-30 min
+    est = estimate_trade_time(4, "EURUSD", {"price": 1.0880, "pdh": 1.0885, "pdl": 1.0800})
+    assert "15-30" in est
+
+    # TRS 3 TRENDING → 1-2 hours
+    est = estimate_trade_time(3, "EURUSD", {"regime": "TRENDING"})
+    assert "1-2" in est
+
+    # TRS 2 → not soon
+    est = estimate_trade_time(2, "EURUSD", {})
+    assert "σύντομα" in est
+
+    # TRS 0 → None
+    est = estimate_trade_time(0, "EURUSD", {})
+    assert est is None
+
+    print("  ✅ Time Estimation — PASS")
+
+
+def test_proximity_bar():
+    """Test: Proximity bar formatting."""
+    bar = format_proximity_bar(80)
+    assert "80%" in bar
+    assert "σχεδόν" in bar
+
+    bar = format_proximity_bar(0)
+    assert "0%" in bar
+    assert "μακριά" in bar
+
+    bar = format_proximity_bar(50)
+    assert "50%" in bar
+    assert "μισός" in bar
+
+    print("  ✅ Proximity Bar — PASS")
+
+
+def test_calculate_trs_includes_proximity():
+    """Test: calculate_trs includes proximity fields."""
+    asset_data = {
+        "asset": "EURUSD", "price": 1.0900, "daily_bias": "BULL", "h4_bias": "BULL",
+        "h1_bias": "BULL", "alignment": "ALIGNED_BULL", "adr_consumed_pct": 45.0,
+        "pdh": 1.0880, "pdl": 1.0800, "regime": "TRENDING", "adx": 30.0, "volume_ratio": 1.5,
+    }
+    result = calculate_trs("EURUSD", asset_data, {"articles": []})
+
+    assert "proximity_score" in result
+    assert "proximity_bar" in result
+    assert "estimated_time" in result
+    assert result["proximity_score"] == 100  # TRS 5/5
+    assert "ΤΩΡΑ" in result["estimated_time"]
+
+    print("  ✅ TRS includes Proximity — PASS")
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 
 if __name__ == "__main__":
@@ -289,6 +377,10 @@ if __name__ == "__main__":
         test_headline_sentiment,
         test_calculate_trs_full,
         test_calculate_trs_mixed,
+        test_proximity_score,
+        test_time_estimation,
+        test_proximity_bar,
+        test_calculate_trs_includes_proximity,
     ]
 
     passed = 0

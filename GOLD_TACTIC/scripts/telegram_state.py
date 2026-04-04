@@ -70,6 +70,13 @@ DEFAULT_STATE = {
     "messages_sent_today": 0,
     "messages_date": None,
     "tier_counts": {"1": 0, "2": 0, "3a": 0, "3b": 0},
+    # Card System tracking
+    "last_card_type": None,
+    "last_asset_cards_sent": {},   # {asset: "timestamp"}
+    "asset_wait_cycles": {},       # {asset: int}
+    "last_trade_card_pnl": 0.0,
+    "cards_sent_today": 0,
+    "expired_assets": [],          # assets that got "expired" card — silence until scanner
 }
 
 
@@ -367,6 +374,86 @@ def get_wait_cycle_message(wait_cycles, expected_trigger, distance_info=""):
     else:
         # Calculate deadline: roughly EOD
         return f"{count}os kyklos — setup pithano akyronetai"
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CARD SYSTEM HELPERS
+# ══════════════════════════════════════════════════════════════════════════════
+
+def should_send_asset_card(asset, deltas, state):
+    """
+    Decide if an asset deserves its own Asset Card.
+
+    YES if: TRS changed, significant price move, arc changed, has open trade
+    NO if: expired asset, nothing changed
+    """
+    # Expired = silence
+    if asset in state.get("expired_assets", []):
+        return False
+
+    price_info = deltas.get("price_changes", {}).get(asset, {})
+    trs_info = deltas.get("trs_changes", {}).get(asset, {})
+    arc_changed = asset in deltas.get("arc_changes", {})
+
+    if trs_info.get("changed"):
+        return True
+    if price_info.get("significant"):
+        return True
+    if arc_changed:
+        return True
+    if asset in deltas.get("new_trades", []):
+        return True
+
+    return False
+
+
+def increment_wait_cycle(state, asset):
+    """Increment wait cycle counter for an asset."""
+    cycles = state.get("asset_wait_cycles", {})
+    cycles[asset] = cycles.get(asset, 0) + 1
+    state["asset_wait_cycles"] = cycles
+    return cycles[asset]
+
+
+def reset_wait_cycle(state, asset):
+    """Reset wait cycle when asset arc changes or trade opens."""
+    cycles = state.get("asset_wait_cycles", {})
+    cycles[asset] = 0
+    state["asset_wait_cycles"] = cycles
+
+
+def reset_expired_assets(state):
+    """Clear expired list. Called by scanner to give assets a fresh chance."""
+    state["expired_assets"] = []
+
+
+def mark_asset_expired(state, asset):
+    """Mark asset as expired. One final card, then silence."""
+    expired = state.get("expired_assets", [])
+    if asset not in expired:
+        expired.append(asset)
+    state["expired_assets"] = expired
+
+
+def get_proximity_summary(trs_scores):
+    """
+    Generate 1-line proximity summary for Status Card.
+
+    Example: "EURUSD (TRS 4/5 — ~30')" or "κανένα"
+    """
+    near_trade = []
+    for asset, data in trs_scores.items():
+        score = data.get("trs_score", 0)
+        if score >= 3:
+            time_est = data.get("estimated_time", "")
+            if score >= 4:
+                near_trade.append(f"{asset} (TRS {score}/5 — {time_est})")
+            elif score == 3:
+                near_trade.append(f"{asset} ({score}/5)")
+
+    if not near_trade:
+        return "κανένα"
+    return ", ".join(near_trade[:3])  # Max 3 assets in summary
 
 
 # ══════════════════════════════════════════════════════════════════════════════

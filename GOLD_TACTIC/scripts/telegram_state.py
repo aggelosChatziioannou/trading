@@ -77,6 +77,15 @@ DEFAULT_STATE = {
     "last_trade_card_pnl": 0.0,
     "cards_sent_today": 0,
     "expired_assets": [],          # assets that got "expired" card — silence until scanner
+    # Overnight summary (24/7 system)
+    "overnight_summary": {
+        "started_at": None,
+        "crypto_start_prices": {},   # {BTC: 66200, SOL: 82.50}
+        "crypto_current_prices": {},
+        "asia_ranges": {},           # {EURUSD: {high: 1.0845, low: 1.0810}, ...}
+        "overnight_news": [],        # [{headline, time, impact}]
+        "digest_sent": False,
+    },
 }
 
 
@@ -373,6 +382,110 @@ def get_wait_cycle_message(wait_cycles, expected_trigger, distance_info=""):
         return f"\u26a0\ufe0f {count}\u03bf\u03c2 \u03ba\u03cd\u03ba\u03bb\u03bf\u03c2 \u2014 \u03b1\u03c1\u03c7\u03af\u03b6\u03b5\u03b9 \u03bd\u03b1 \u03b1\u03c1\u03b3\u03b5\u03af \u03c4\u03bf {expected_trigger}"
     else:
         return f"\u274c {count}\u03bf\u03c2 \u03ba\u03cd\u03ba\u03bb\u03bf\u03c2 \u2014 setup \u03c0\u03b9\u03b8\u03b1\u03bd\u03ac \u03b1\u03ba\u03c5\u03c1\u03ce\u03bd\u03b5\u03c4\u03b1\u03b9"
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# OVERNIGHT SUMMARY (24/7 System)
+# ══════════════════════════════════════════════════════════════════════════════
+
+def accumulate_overnight(state, crypto_prices, forex_prices=None, news_items=None):
+    """
+    Add data to overnight buffer during NIGHT/ASIA zones.
+    Called each cycle. Builds up summary for morning digest.
+    """
+    overnight = state.get("overnight_summary", {})
+
+    # Initialize if first call of the night
+    if not overnight.get("started_at"):
+        overnight["started_at"] = datetime.now().strftime("%Y-%m-%d %H:%M EET")
+        overnight["crypto_start_prices"] = dict(crypto_prices) if crypto_prices else {}
+        overnight["crypto_current_prices"] = {}
+        overnight["asia_ranges"] = {}
+        overnight["overnight_news"] = []
+        overnight["digest_sent"] = False
+
+    # Update crypto prices
+    if crypto_prices:
+        overnight["crypto_current_prices"] = dict(crypto_prices)
+
+    # Track Asia ranges (forex H/L)
+    if forex_prices:
+        for asset, price in forex_prices.items():
+            if asset not in overnight["asia_ranges"]:
+                overnight["asia_ranges"][asset] = {"high": price, "low": price}
+            else:
+                r = overnight["asia_ranges"][asset]
+                r["high"] = max(r["high"], price)
+                r["low"] = min(r["low"], price)
+
+    # Accumulate news
+    if news_items:
+        for item in news_items:
+            # Dedup by headline
+            existing = [n.get("headline") for n in overnight["overnight_news"]]
+            if item.get("headline") not in existing:
+                overnight["overnight_news"].append(item)
+
+    state["overnight_summary"] = overnight
+
+
+def format_morning_digest(state):
+    """
+    Generate Morning Digest card text from accumulated overnight data.
+    Sent at 07:30 EET.
+
+    Returns: str (Telegram message) or None if no data
+    """
+    overnight = state.get("overnight_summary", {})
+    if not overnight.get("started_at"):
+        return None
+
+    lines = ["\U0001f305 <b>MORNING DIGEST</b> \u2014 \u03a4\u03b9 \u03ad\u03b3\u03b9\u03bd\u03b5 \u03c4\u03b7 \u03bd\u03cd\u03c7\u03c4\u03b1\n"]
+
+    # Crypto performance
+    start = overnight.get("crypto_start_prices", {})
+    current = overnight.get("crypto_current_prices", {})
+    for asset in ["BTC", "SOL", "ETH"]:
+        if asset in start and asset in current:
+            s = start[asset]
+            c = current[asset]
+            if s > 0:
+                pct = ((c - s) / s) * 100
+                emoji = "\U0001f7e2" if pct >= 0 else "\U0001f534"
+                lines.append(f"{emoji} {asset}: ${s:,.0f} \u2192 ${c:,.0f} ({pct:+.1f}%)")
+
+    # Asia ranges
+    asia = overnight.get("asia_ranges", {})
+    for asset in ["EURUSD", "GBPUSD"]:
+        if asset in asia:
+            r = asia[asset]
+            range_pips = abs(r["high"] - r["low"]) / 0.0001
+            lines.append(f"\U0001f4cf Asia Range {asset}: {r['low']:.4f}\u2013{r['high']:.4f} ({range_pips:.0f} pips)")
+
+    # News
+    news = overnight.get("overnight_news", [])
+    if news:
+        lines.append(f"\n\U0001f4f0 {len(news)} \u03b5\u03b9\u03b4\u03ae\u03c3\u03b5\u03b9\u03c2 \u03c4\u03b7 \u03bd\u03cd\u03c7\u03c4\u03b1")
+        for n in news[:3]:
+            lines.append(f"  \u2022 {n.get('headline', '?')[:60]}")
+    else:
+        lines.append("\n\U0001f4f0 \u039a\u03b1\u03bc\u03af\u03b1 \u03c3\u03b7\u03bc\u03b1\u03bd\u03c4\u03b9\u03ba\u03ae \u03b5\u03af\u03b4\u03b7\u03c3\u03b7 \u03c4\u03b7 \u03bd\u03cd\u03c7\u03c4\u03b1")
+
+    lines.append("\n\u2192 Scanner \u03c3\u03b5 30'")
+
+    return "\n".join(lines)
+
+
+def clear_overnight(state):
+    """Reset overnight buffer after morning digest sent."""
+    state["overnight_summary"] = {
+        "started_at": None,
+        "crypto_start_prices": {},
+        "crypto_current_prices": {},
+        "asia_ranges": {},
+        "overnight_news": [],
+        "digest_sent": True,
+    }
 
 
 # ══════════════════════════════════════════════════════════════════════════════

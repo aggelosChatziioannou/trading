@@ -57,15 +57,143 @@ def log(msg):
 # ── Pure functions (testable) ─────────────────────────────────────────────────
 
 def is_active_window(now=None):
-    """Return True if current time is within the active trading window."""
+    """Return True if current time is within the active trading window.
+    LEGACY — kept for backward compatibility. Always returns True in 24/7 mode.
+    Use get_zone() for zone-specific logic instead."""
+    return True  # 24/7 mode — system never fully stops
+
+
+# ── 5-Zone System (24/7 Adaptive Schedule) ───────────────────────────────────
+
+# Zone definitions: (name, interval_minutes, max_tier, can_open_new_trades)
+ZONES = {
+    "NIGHT":   {"interval": 60, "max_tier": 1, "can_trade": False, "assets": ["BTC", "SOL"]},
+    "ASIA":    {"interval": 30, "max_tier": 2, "can_trade": False, "assets": ["BTC", "SOL", "EURUSD", "GBPUSD"]},
+    "LONDON":  {"interval": 10, "max_tier": 3, "can_trade": True,  "assets": "ALL"},
+    "NY":      {"interval": 10, "max_tier": 3, "can_trade": True,  "assets": "ALL"},
+    "EVENING": {"interval": 20, "max_tier": 2, "can_trade": False, "assets": ["BTC", "SOL"]},
+}
+
+
+def get_zone(now=None):
+    """
+    Determine current trading zone based on time.
+
+    Returns: dict {name, interval, max_tier, can_trade, assets}
+
+    Zones (EET, all days):
+      NIGHT:   22:00 - 04:00  (crypto only, 60min, watchdog)
+      ASIA:    04:00 - 08:00  (crypto+forex watch, 30min)
+      LONDON:  08:00 - 15:30  (all, 10min, full trading)
+      NY:      15:30 - 20:00  (all, 10min, full trading)
+      EVENING: 20:00 - 22:00  (crypto+close only, 20min)
+    """
     if now is None:
         now = datetime.now()
-    weekday = now.weekday()  # 0=Mon … 6=Sun
     t = now.time()
-    if weekday < 5:          # Mon–Fri
-        return time(8, 0) <= t < time(22, 0)
-    else:                    # Sat–Sun
-        return time(10, 0) <= t < time(20, 0)
+
+    if time(22, 0) <= t or t < time(4, 0):
+        zone_name = "NIGHT"
+    elif time(4, 0) <= t < time(8, 0):
+        zone_name = "ASIA"
+    elif time(8, 0) <= t < time(15, 30):
+        zone_name = "LONDON"
+    elif time(15, 30) <= t < time(20, 0):
+        zone_name = "NY"
+    else:  # 20:00 - 22:00
+        zone_name = "EVENING"
+
+    zone = ZONES[zone_name].copy()
+    zone["name"] = zone_name
+
+    # Weekend: crypto-only regardless of zone (forex markets closed)
+    if now.weekday() >= 5:  # Sat, Sun
+        zone["assets"] = ["BTC", "SOL", "ETH"]
+        if zone_name in ("LONDON", "NY"):
+            zone["can_trade"] = True   # Crypto can trade on weekends
+            zone["max_tier"] = 3
+        else:
+            zone["can_trade"] = False
+
+    return zone
+
+
+def cold_start_check(now=None):
+    """
+    Detect if system was offline and decide bootstrap action.
+
+    Returns: dict {gap_hours, action, reason, has_orphaned_trades}
+
+    Actions:
+      "resume"      — gap < 2h, continue normally
+      "catch_up"    — gap 2-8h, quick scan + current zone
+      "full_scan"   — gap 8-24h, full scanner immediately
+      "full_reset"  — gap > 24h, complete reset
+      "fresh_start" — gap > 7 days, brand new
+    """
+    if now is None:
+        now = datetime.now()
+
+    # Find last cycle time from session_log.jsonl
+    session_log = DATA_DIR / "session_log.jsonl"
+    last_cycle_time = None
+
+    if session_log.exists():
+        try:
+            lines = session_log.read_text(encoding="utf-8").strip().split("\n")
+            for line in reversed(lines):
+                if line.strip():
+                    entry = json.loads(line.strip())
+                    time_str = entry.get("time", "")
+                    # Parse "2026-04-04 14:30 EET" format
+                    dt_str = time_str.replace(" EET", "").strip()
+                    if dt_str:
+                        last_cycle_time = datetime.strptime(dt_str, "%Y-%m-%d %H:%M")
+                        break
+        except Exception:
+            pass
+
+    # Check for orphaned trades
+    portfolio_file = DATA_DIR / "portfolio.json"
+    has_orphaned = False
+    if portfolio_file.exists():
+        try:
+            portfolio = json.loads(portfolio_file.read_text(encoding="utf-8"))
+            has_orphaned = len(portfolio.get("open_trades", [])) > 0
+        except Exception:
+            pass
+
+    # Determine gap
+    if last_cycle_time is None:
+        gap_hours = 999
+    else:
+        gap = now - last_cycle_time
+        gap_hours = gap.total_seconds() / 3600
+
+    # Decide action
+    if gap_hours < 2:
+        action = "resume"
+        reason = f"Gap {gap_hours:.1f}h — resuming normally"
+    elif gap_hours < 8:
+        action = "catch_up"
+        reason = f"Gap {gap_hours:.1f}h — quick catch-up scan"
+    elif gap_hours < 24:
+        action = "full_scan"
+        reason = f"Gap {gap_hours:.1f}h — full scanner needed"
+    elif gap_hours < 168:  # 7 days
+        action = "full_reset"
+        reason = f"Gap {gap_hours:.0f}h ({gap_hours/24:.0f} days) — full reset"
+    else:
+        action = "fresh_start"
+        reason = f"Gap {gap_hours:.0f}h ({gap_hours/24:.0f} days) — fresh start"
+
+    return {
+        "gap_hours": round(gap_hours, 1),
+        "action": action,
+        "reason": reason,
+        "has_orphaned_trades": has_orphaned,
+        "last_cycle": last_cycle_time.strftime("%Y-%m-%d %H:%M") if last_cycle_time else None,
+    }
 
 
 def bootstrap_cycle_type(now=None):
@@ -295,9 +423,16 @@ def main():
         if idx + 1 < len(sys.argv):
             preferred_cli = sys.argv[idx + 1].lower().strip()
 
-    # 1. Dead zone check
-    if not is_active_window(now):
-        return  # silent exit
+    # 1. Zone detection (24/7 — no dead zone, just different intensity)
+    zone = get_zone(now)
+    log(f"zone: {zone['name']} | interval: {zone['interval']}min | trade: {zone['can_trade']}")
+
+    # 1b. Cold start check
+    cold_start = cold_start_check(now)
+    if cold_start["action"] != "resume":
+        log(f"COLD START: {cold_start['reason']}")
+        if cold_start["has_orphaned_trades"]:
+            log("ORPHANED TRADES detected — forcing TIER 3")
 
     # 2. API key safety check — subscription billing requires NO API key for Claude
     cli_name, cli_path = detect_cli(preferred_cli)
@@ -390,12 +525,21 @@ def main():
     # 6. Select timeout based on tier_hint
     timeout = TIMEOUTS.get(tier_hint, DEFAULT_TIMEOUT)
 
-    # 7. Build prompt
+    # 7. Build prompt (includes zone + cold start info)
     rel_prompt = prompt_file.relative_to(BASE_DIR)
+    zone_info = f"Zone: {zone['name']} | Interval: {zone['interval']}min | Can trade: {zone['can_trade']}"
+    cold_info = ""
+    if cold_start["action"] != "resume":
+        cold_info = f"\nCOLD START: {cold_start['reason']}. Action: {cold_start['action']}."
+        if cold_start["has_orphaned_trades"]:
+            cold_info += " ORPHANED TRADES found — check portfolio immediately."
+
     prompt_text = (
         f"Εκτέλεσε cycle. Ώρα: {now.strftime('%H:%M')} EET.\n"
+        f"{zone_info}\n"
         f"Διάβασε: {rel_prompt} και εκτέλεσε ακριβώς.\n"
         f"Working dir: {BASE_DIR}"
+        f"{cold_info}"
     )
 
     # 8. Build CLI-specific invoke args

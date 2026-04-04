@@ -4,6 +4,37 @@
 
 ---
 
+## Setup on a New PC
+
+**After cloning, you MUST update the hardcoded paths in 3 prompt files.**
+
+The prompts contain `C:\Users\aggel\Desktop\trading` — replace with your actual clone path.
+
+**Quick way (PowerShell):**
+```powershell
+$old = "C:\Users\aggel\Desktop\trading"
+$new = "C:\YOUR\ACTUAL\PATH\trading"   # <-- change this
+
+Get-ChildItem "GOLD_TACTIC\prompts\*.md" | ForEach-Object {
+    (Get-Content $_.FullName) -replace [regex]::Escape($old), $new | Set-Content $_.FullName
+}
+```
+
+**Also update `.mcp.json`** — change the tradingview-mcp path:
+```json
+"args": ["C:/YOUR/PATH/tradingview-mcp/src/server.js"]
+```
+Install the MCP server: `git clone https://github.com/tradesdontlie/tradingview-mcp && cd tradingview-mcp && npm install`
+
+**Python dependencies:**
+```bash
+pip install yfinance pandas numpy mplfinance requests python-dotenv
+```
+
+That's it — `.env` with all keys is included in the repo.
+
+---
+
 ## What This Is
 
 An adaptive AI trading analyst that runs inside **Claude Code** as an autonomous agent. It monitors markets, scores setups, manages open trades, and sends alerts via Telegram — all driven by a single large prompt (`adaptive_analyst.md`) that contains the complete decision-making logic.

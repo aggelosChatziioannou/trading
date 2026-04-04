@@ -53,12 +53,28 @@ Screenshots:   C:\Users\aggel\Desktop\trading\GOLD_TACTIC\screenshots\
 
 ## ΒΗΜΑ 2 — ΦΕΡΕ ΝΕΑ + ΤΙΜΕΣ
 
+**2a — TradingView MCP Data Fetch:**
+Κάλεσε `tv_health_check()`. Αν `success: true`, για κάθε asset:
+```
+Symbols: EURUSD=FX:EURUSD, GBPUSD=FX:GBPUSD, NAS100=CAPITALCOM:US100,
+         XAUUSD=OANDA:XAUUSD, BTC=BITSTAMP:BTCUSD, SOL=BINANCE:SOLUSDT, DXY=TVC:DXY
+
+chart_set_symbol(tv_symbol) →
+  chart_set_timeframe("D")  → data_get_ohlcv(count=100) → "D" bars
+  chart_set_timeframe("4H") → data_get_ohlcv(count=100) → "4H" bars
+  chart_set_timeframe("60") → data_get_ohlcv(count=100) → "1H" bars
+```
+Αποθήκευσε `data\tv_ohlcv_raw.json`:
+`{"fetch_time": "...", "assets": {"EURUSD": {"D": [...], "4H": [...], "1H": [...]}, ...}}`
+
+**2b — Scripts:**
 ```bash
 cd C:\Users\aggel\Desktop\trading
 python GOLD_TACTIC\scripts\news_scout.py
 python GOLD_TACTIC\scripts\price_checker.py
-python GOLD_TACTIC\scripts\quick_scan.py --json
+python GOLD_TACTIC\scripts\quick_scan.py --from-file --json
 ```
+(Αν 2a απέτυχε: τρέξε quick_scan.py χωρίς `--from-file`)
 
 **Διάβασε** `data\quick_scan.json` — δείχνει alignment, RSI, ADR% για κάθε asset + **DXY bias**.
 - DXY BULL → USD δυνατό → EURUSD/GBPUSD SHORT ενισχυμένο

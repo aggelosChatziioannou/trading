@@ -5,10 +5,11 @@ Multi-timeframe dashboard: Daily/4H/1H bias, RSI, ADR, Market Regime, Correlatio
 Reduces Agent token usage by pre-computing alignment.
 
 Usage:
-  python quick_scan.py              # All core assets
+  python quick_scan.py              # All core assets (yfinance)
   python quick_scan.py EURUSD BTC   # Specific assets
   python quick_scan.py --json       # JSON output for Agent
   python quick_scan.py --changes    # Compare vs last scan, output changes JSON
+  python quick_scan.py --from-file  # Use pre-fetched TradingView MCP data (tv_ohlcv_raw.json)
 """
 
 import json
@@ -26,6 +27,7 @@ if sys.platform == 'win32':
 
 OUTPUT_DIR = Path(__file__).parent.parent / "data"
 ERROR_LOG = OUTPUT_DIR / "price_checker_errors.log"
+TV_RAW_FILE = OUTPUT_DIR / "tv_ohlcv_raw.json"
 
 def log_error(source, error):
     """Log errors to file for debugging scheduled runs."""
@@ -177,25 +179,48 @@ def get_bias(df):
         return "MIXED"
 
 
-def scan_asset(name, config):
+def load_tv_bars(tv_data, asset, timeframe):
+    """Convert TradingView MCP OHLCV bars to pandas DataFrame.
+    tv_data format: {"assets": {"EURUSD": {"D": [...bars], "4H": [...], "1H": [...]}}}
+    """
+    bars = tv_data.get("assets", {}).get(asset, {}).get(timeframe, [])
+    if not bars:
+        return None
+    df = pd.DataFrame(bars)
+    df["Date"] = pd.to_datetime(df["time"], unit="s", utc=True)
+    df = df.set_index("Date").sort_index()
+    df = df.rename(columns={"open": "Open", "high": "High", "low": "Low", "close": "Close", "volume": "Volume"})
+    return df[["Open", "High", "Low", "Close", "Volume"]]
+
+
+def scan_asset(name, config, tv_data=None):
     symbol = config["yf"]
     result = {"asset": name, "error": None}
 
     try:
-        # Daily data (3 months for SMA50)
-        daily = yf.download(symbol, period="3mo", interval="1d", progress=False)
-        if isinstance(daily.columns, pd.MultiIndex):
-            daily.columns = daily.columns.get_level_values(0)
+        if tv_data is not None:
+            # Use pre-fetched TradingView MCP data
+            daily = load_tv_bars(tv_data, name, "D")
+            h4 = load_tv_bars(tv_data, name, "4H")
+            h1 = load_tv_bars(tv_data, name, "1H")
+            if daily is None or daily.empty:
+                result["error"] = "No TV data"
+                return result
+        else:
+            # Daily data (3 months for SMA50)
+            daily = yf.download(symbol, period="3mo", interval="1d", progress=False)
+            if isinstance(daily.columns, pd.MultiIndex):
+                daily.columns = daily.columns.get_level_values(0)
 
-        # 4H data (1 month)
-        h4 = yf.download(symbol, period="1mo", interval="1h", progress=False)
-        if isinstance(h4.columns, pd.MultiIndex):
-            h4.columns = h4.columns.get_level_values(0)
+            # 4H data (1 month)
+            h4 = yf.download(symbol, period="1mo", interval="1h", progress=False)
+            if isinstance(h4.columns, pd.MultiIndex):
+                h4.columns = h4.columns.get_level_values(0)
 
-        # 1H data (5 days)
-        h1 = yf.download(symbol, period="5d", interval="1h", progress=False)
-        if isinstance(h1.columns, pd.MultiIndex):
-            h1.columns = h1.columns.get_level_values(0)
+            # 1H data (5 days)
+            h1 = yf.download(symbol, period="5d", interval="1h", progress=False)
+            if isinstance(h1.columns, pd.MultiIndex):
+                h1.columns = h1.columns.get_level_values(0)
 
         if daily.empty:
             result["error"] = "No data"
@@ -277,16 +302,21 @@ def alignment_emoji(a):
         return "❌"
 
 
-def compute_correlations():
+def compute_correlations(tv_data=None):
     """Compute 20-day rolling correlations for key pairs."""
     closes = {}
     for name, config in ASSETS.items():
         try:
-            df = yf.download(config["yf"], period="1mo", interval="1d", progress=False)
-            if isinstance(df.columns, pd.MultiIndex):
-                df.columns = df.columns.get_level_values(0)
-            if not df.empty and len(df) >= 5:
-                closes[name] = df['Close'].dropna()
+            if tv_data is not None:
+                df = load_tv_bars(tv_data, name, "D")
+                if df is not None and len(df) >= 5:
+                    closes[name] = df['Close'].dropna()
+            else:
+                df = yf.download(config["yf"], period="1mo", interval="1d", progress=False)
+                if isinstance(df.columns, pd.MultiIndex):
+                    df.columns = df.columns.get_level_values(0)
+                if not df.empty and len(df) >= 5:
+                    closes[name] = df['Close'].dropna()
         except Exception as e:
             log_error(f"corr-{name}", str(e))
 
@@ -378,13 +408,28 @@ def main():
     args = sys.argv[1:]
     json_mode = "--json" in args
     changes_mode = "--changes" in args
-    args = [a for a in args if a not in ("--json", "--changes")]
+    from_file = "--from-file" in args
+    args = [a for a in args if a not in ("--json", "--changes", "--from-file")]
 
     assets_to_scan = args if args else ["EURUSD", "GBPUSD", "NAS100", "SOL", "BTC", "DXY"]
 
     output_file = OUTPUT_DIR / "quick_scan.json"
     corr_file = OUTPUT_DIR / "correlation_matrix.json"
     regime_file = OUTPUT_DIR / "market_regime.json"
+
+    # Load TradingView pre-fetched data if requested
+    tv_data = None
+    if from_file:
+        try:
+            with open(TV_RAW_FILE, "r", encoding="utf-8") as f:
+                tv_data = json.load(f)
+            if not json_mode:
+                print(f"[TV MCP] Using pre-fetched data from {TV_RAW_FILE} ({tv_data.get('fetch_time', '?')})")
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            log_error("from-file", f"Cannot load {TV_RAW_FILE}: {e}. Falling back to yfinance.")
+            if not json_mode:
+                print(f"[TV MCP] WARNING: {TV_RAW_FILE} not found, falling back to yfinance", file=sys.stderr)
+            tv_data = None
 
     # Load previous scan for --changes mode
     prev_scan = None
@@ -398,11 +443,11 @@ def main():
     results = []
     for name in assets_to_scan:
         if name in ASSETS:
-            r = scan_asset(name, ASSETS[name])
+            r = scan_asset(name, ASSETS[name], tv_data=tv_data)
             results.append(r)
 
     # Compute correlations
-    correlations = compute_correlations()
+    correlations = compute_correlations(tv_data=tv_data)
     with open(corr_file, 'w') as f:
         json.dump({
             "scan_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),

@@ -20,6 +20,7 @@ data/processed/
 # Global JSON exclusion (overridden below for GOLD_TACTIC)
 *.json
 !data/.gitkeep
+!.mcp.json
 
 # GOLD_TACTIC — include scripts, prompts, data templates, backtest results
 !GOLD_TACTIC/scripts/**

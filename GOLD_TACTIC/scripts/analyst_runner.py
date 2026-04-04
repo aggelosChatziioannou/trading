@@ -16,6 +16,7 @@ import re
 import shutil
 import subprocess
 import sys
+import urllib.request
 from datetime import date, datetime, time
 from pathlib import Path
 
@@ -222,6 +223,65 @@ def send_alert(msg):
         pass
 
 
+# ── Health check (FIX #3) ────────────────────────────────────────────────────
+
+def health_check():
+    """
+    Ελέγχει βασικές υπηρεσίες πριν τρέξει κύκλος.
+    Returns: (ok: bool, errors: list[str])
+
+    Checks:
+      1. Data directory exists (BLOCKING)
+      2. Python imports (yfinance, pandas, numpy)
+      3. Telegram bot connectivity
+      4. Portfolio file exists (warning)
+    """
+    errors = []
+
+    # Check 1: Data directory (BLOCKING — χωρίς αυτό δεν τρέχει τίποτα)
+    if not DATA_DIR.exists() or not DATA_DIR.is_dir():
+        errors.append(f"CRITICAL: Data directory missing: {DATA_DIR}")
+        return False, errors
+
+    # Check 2: Python imports
+    for module_name in ("yfinance", "pandas", "numpy"):
+        try:
+            __import__(module_name)
+        except ImportError:
+            errors.append(f"Missing Python module: {module_name}")
+
+    # Check 3: Telegram bot
+    try:
+        # Φόρτωσε token από .env αν υπάρχει
+        env_file = BASE_DIR / ".env"
+        tg_token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+        if not tg_token and env_file.exists():
+            for line in env_file.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if line.startswith("TELEGRAM_BOT_TOKEN="):
+                    tg_token = line.split("=", 1)[1].strip().strip("'\"")
+                    break
+        if tg_token:
+            url = f"https://api.telegram.org/bot{tg_token}/getMe"
+            req = urllib.request.Request(url, method="GET")
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                data = json.loads(resp.read())
+                if not data.get("ok"):
+                    errors.append("Telegram bot: API returned ok=false")
+        else:
+            errors.append("Telegram bot: token not found in .env or environment")
+    except Exception as e:
+        errors.append(f"Telegram bot unreachable: {type(e).__name__}: {e}")
+
+    # Check 4: Portfolio file (warning only)
+    portfolio_file = DATA_DIR / "portfolio.json"
+    if not portfolio_file.exists():
+        errors.append("Warning: portfolio.json not found (will use defaults)")
+
+    ok = not any("CRITICAL" in e for e in errors)
+    return ok, errors
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
@@ -257,6 +317,16 @@ def main():
         print("Please install Claude Code or Kimi Code CLI and ensure it's on PATH.")
         sys.exit(1)
 
+    # 2b. Health check (FIX #3)
+    ok, health_errors = health_check()
+    if health_errors:
+        for err in health_errors:
+            log(f"HEALTH: {err}")
+    if not ok:
+        log(f"HEALTH CHECK FAILED — aborting cycle")
+        send_alert(f"🏥 GOLD TACTIC Health: {'; '.join(health_errors)}")
+        sys.exit(1)
+
     # 3. Read and validate next_cycle.json
     cycle_type = None
     tier_hint = 3
@@ -264,6 +334,12 @@ def main():
     try:
         if not NEXT_CYCLE_FILE.exists():
             raise ValueError("missing file")
+
+        # FIX #4: Backup πριν το parsing
+        try:
+            shutil.copy2(NEXT_CYCLE_FILE, str(NEXT_CYCLE_FILE) + ".bak")
+        except Exception:
+            pass
 
         data = json.loads(NEXT_CYCLE_FILE.read_text(encoding="utf-8"))
 
@@ -288,7 +364,15 @@ def main():
     except (ValueError, KeyError, json.JSONDecodeError) as e:
         log(f"bootstrap ({e})")
         cycle_type = bootstrap_cycle_type(now)
-        tier_hint = 3
+        # FIX #4: TIER 2 κατά το bootstrap (εξοικονόμηση tokens)
+        # TIER 3 μόνο για scanner_morning ή αν δεν είμαστε σε active window
+        tier_hint = 3 if cycle_type == "scanner_morning" else 2
+
+        # Track bootstrap metadata
+        failures = load_failures()
+        failures["last_bootstrap_reason"] = str(e)
+        failures["last_bootstrap_time"] = now.strftime("%Y-%m-%d %H:%M")
+        save_failures(failures)
 
     # 4. Scanner afternoon override (runner-level, authoritative)
     if now.weekday() < 5 and time(15, 20) <= now.time() <= time(15, 40):
@@ -335,9 +419,12 @@ def main():
         duration = int((datetime.now() - t_start).total_seconds())
 
         if result.returncode == 0:
-            if failures["count"] > 0:
-                failures = {"count": 0, "last_error": ""}
-                save_failures(failures)
+            failures = {
+                "count": 0,
+                "last_error": "",
+                "last_successful_cycle": f"{cycle_type} tier{tier_hint} @ {now.strftime('%H:%M')}",
+            }
+            save_failures(failures)
             status = "ok"
         else:
             failures["count"] += 1

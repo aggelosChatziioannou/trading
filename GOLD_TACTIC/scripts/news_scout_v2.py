@@ -288,11 +288,97 @@ def scout_full(asset_filter=None):
     return result
 
 
+# ── News Summarization (FIX #11) ─────────────────────────────────────────────
+
+BULLISH_WORDS = [
+    "rally", "surge", "soar", "jump", "gain", "rise", "bullish", "breakout",
+    "record high", "all-time high", "pump", "boost", "recovery", "strong",
+    "upbeat", "optimistic", "hawkish", "buy",
+]
+BEARISH_WORDS = [
+    "crash", "plunge", "dump", "drop", "fall", "decline", "bearish",
+    "breakdown", "sell-off", "selloff", "fear", "panic", "recession",
+    "weak", "dovish", "cut", "loss", "risk-off", "downgrade",
+]
+
+
+def _detect_headline_sentiment(headline):
+    """Simple keyword sentiment detection."""
+    if not headline:
+        return "neutral"
+    lower = headline.lower()
+    bull = sum(1 for kw in BULLISH_WORDS if kw in lower)
+    bear = sum(1 for kw in BEARISH_WORDS if kw in lower)
+    if bull > bear:
+        return "bullish"
+    elif bear > bull:
+        return "bearish"
+    return "neutral"
+
+
+def summarize_news(result):
+    """
+    Δημιουργεί compact summary: top 3 headlines ανά asset + sentiment.
+    Μειώνει tokens που χρειάζεται ο Analyst να διαβάσει.
+    """
+    summary = {}
+
+    for asset_key, asset_data in result.get("assets", {}).items():
+        articles = asset_data.get("news", [])
+        if not articles:
+            continue
+
+        top_3 = articles[:3]
+        summaries = []
+        sentiment_counts = {"bullish": 0, "bearish": 0, "neutral": 0}
+
+        for article in top_3:
+            headline = article.get("headline") or article.get("title") or "?"
+            # Use existing sentiment if available (CryptoPanic), else detect
+            sent = article.get("sentiment", "").lower()
+            if sent not in ("bullish", "bearish"):
+                sent = _detect_headline_sentiment(headline)
+
+            sentiment_counts[sent] = sentiment_counts.get(sent, 0) + 1
+            summaries.append({
+                "headline": headline[:120],
+                "sentiment": sent,
+            })
+
+        # Overall sentiment for this asset
+        if sentiment_counts["bullish"] > sentiment_counts["bearish"]:
+            overall = "bullish"
+        elif sentiment_counts["bearish"] > sentiment_counts["bullish"]:
+            overall = "bearish"
+        else:
+            overall = "neutral"
+
+        summary[asset_key] = {
+            "overall_sentiment": overall,
+            "article_count": len(articles),
+            "top_headlines": summaries,
+        }
+
+    return summary
+
+
 if __name__ == "__main__":
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     asset_filter = [a.upper() for a in args] if args else None
+    do_summarize = "--summarize" in sys.argv
 
     if "--light" in sys.argv:
-        scout_light(asset_filter)
+        result = scout_light(asset_filter)
     else:
-        scout_full(asset_filter)
+        result = scout_full(asset_filter)
+
+    if do_summarize and result:
+        summary = summarize_news(result)
+        result["summary"] = summary
+        NEWS_FILE.write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding='utf-8')
+        print(f"\nSummary ({len(summary)} assets):")
+        for asset, info in summary.items():
+            emoji = {"bullish": "🟢", "bearish": "🔴", "neutral": "⚪"}.get(info["overall_sentiment"], "?")
+            print(f"  {emoji} {asset}: {info['overall_sentiment']} ({info['article_count']} articles)")
+            for h in info["top_headlines"]:
+                print(f"      [{h['sentiment']}] {h['headline'][:80]}")

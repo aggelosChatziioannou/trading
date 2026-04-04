@@ -464,10 +464,50 @@ def main():
             "adx": adx_values,
         }, f, indent=2)
 
+    # FIX #5: Drawdown integration — available in every TIER
+    drawdown_info = None
+    try:
+        sys.path.insert(0, str(Path(__file__).parent))
+        from risk_manager import check_drawdown
+        drawdown_info = check_drawdown()
+    except Exception as e:
+        log_error("quick_scan-drawdown", f"Could not check drawdown: {e}")
+        drawdown_info = {"level": "SAFE", "can_trade": True, "drawdown_pct": 0.0, "daily_loss_pct": 0.0, "message": "Drawdown check unavailable"}
+
+    # FIX #12: VIX overlay
+    vix_info = None
+    try:
+        vix_df = yf.download("^VIX", period="5d", interval="1d", progress=False)
+        if isinstance(vix_df.columns, pd.MultiIndex):
+            vix_df.columns = vix_df.columns.get_level_values(0)
+        if not vix_df.empty and len(vix_df) >= 2:
+            vix_level = float(vix_df['Close'].iloc[-1])
+            vix_prev = float(vix_df['Close'].iloc[-2])
+            vix_change = round(vix_level - vix_prev, 2)
+
+            if vix_level > 30:
+                vix_regime = "EXTREME_FEAR"
+            elif vix_level > 20:
+                vix_regime = "FEAR"
+            elif vix_level < 15:
+                vix_regime = "COMPLACENT"
+            else:
+                vix_regime = "NEUTRAL"
+
+            vix_info = {
+                "vix_level": round(vix_level, 2),
+                "vix_change": vix_change,
+                "vix_regime": vix_regime,
+            }
+    except Exception as e:
+        log_error("quick_scan-vix", f"VIX fetch failed: {e}")
+
     new_scan = {
         "scan_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "assets": results,
         "correlations": correlations,
+        "drawdown": drawdown_info,
+        "vix": vix_info,
     }
 
     # Always save the fresh scan

@@ -140,6 +140,109 @@ def save_history(history):
 
 
 # ============================================================
+# DRAWDOWN TRACKER (FIX #5)
+# ============================================================
+
+def check_drawdown(portfolio_path=None):
+    """
+    Ελέγχει το τρέχον drawdown level.
+
+    Levels:
+      SAFE    (< 3%)   → Κανένα restriction
+      CAUTION (3-4%)   → Warning στο Telegram
+      DANGER  (4-5%)   → Force minimum TIER 2
+      BLOCKED (>= 5%)  → Αρνείται νέα trades + alert
+
+    Args:
+        portfolio_path: Optional Path to portfolio.json (default: DATA_DIR)
+
+    Returns: dict {level, can_trade, drawdown_pct, daily_loss_pct, message}
+    """
+    # Φόρτωσε portfolio — δοκίμασε πρώτα το DATA_DIR (σωστό), μετά fallback
+    portfolio = None
+    paths_to_try = []
+
+    if portfolio_path:
+        paths_to_try.append(Path(portfolio_path))
+
+    # Primary: GOLD_TACTIC/data/portfolio.json
+    data_dir_portfolio = Path(__file__).parent.parent / "data" / "portfolio.json"
+    paths_to_try.append(data_dir_portfolio)
+
+    # Fallback: same directory as script (legacy)
+    paths_to_try.append(PORTFOLIO_FILE)
+
+    for p in paths_to_try:
+        if p.exists():
+            try:
+                portfolio = json.loads(p.read_text(encoding='utf-8'))
+                break
+            except (json.JSONDecodeError, Exception):
+                continue
+
+    if portfolio is None:
+        return {
+            "level": "SAFE",
+            "can_trade": True,
+            "drawdown_pct": 0.0,
+            "daily_loss_pct": 0.0,
+            "message": "Portfolio not found — defaults (SAFE)"
+        }
+
+    initial = portfolio.get("initial_capital", 1000.0)
+    equity = portfolio.get("total_equity", portfolio.get("current_balance", initial))
+    daily_pnl = portfolio.get("daily_pnl", 0.0)
+
+    # Reset daily P&L check
+    today = datetime.now().strftime("%Y-%m-%d")
+    if portfolio.get("daily_pnl_date") != today:
+        daily_pnl = 0.0
+
+    # Υπολογισμοί
+    if initial <= 0:
+        initial = 1000.0  # safety fallback
+
+    drawdown_pct = max(0.0, ((initial - equity) / initial) * 100)
+    daily_loss_pct = max(0.0, (abs(min(daily_pnl, 0)) / initial) * 100)
+
+    # Πάρε τη χειρότερη μετρική
+    worst_pct = max(drawdown_pct, daily_loss_pct)
+
+    if worst_pct >= 5.0:
+        return {
+            "level": "BLOCKED",
+            "can_trade": False,
+            "drawdown_pct": round(drawdown_pct, 2),
+            "daily_loss_pct": round(daily_loss_pct, 2),
+            "message": f"🚫 BLOCKED — Drawdown {drawdown_pct:.1f}% / Daily loss {daily_loss_pct:.1f}% (limit: 5%)"
+        }
+    elif worst_pct >= 4.0:
+        return {
+            "level": "DANGER",
+            "can_trade": True,
+            "drawdown_pct": round(drawdown_pct, 2),
+            "daily_loss_pct": round(daily_loss_pct, 2),
+            "message": f"⚠️ DANGER — Drawdown {drawdown_pct:.1f}% / Daily loss {daily_loss_pct:.1f}% (κοντά στο 5%)"
+        }
+    elif worst_pct >= 3.0:
+        return {
+            "level": "CAUTION",
+            "can_trade": True,
+            "drawdown_pct": round(drawdown_pct, 2),
+            "daily_loss_pct": round(daily_loss_pct, 2),
+            "message": f"🟡 CAUTION — Drawdown {drawdown_pct:.1f}% / Daily loss {daily_loss_pct:.1f}%"
+        }
+    else:
+        return {
+            "level": "SAFE",
+            "can_trade": True,
+            "drawdown_pct": round(drawdown_pct, 2),
+            "daily_loss_pct": round(daily_loss_pct, 2),
+            "message": f"✅ SAFE — Drawdown {drawdown_pct:.1f}% / Daily loss {daily_loss_pct:.1f}%"
+        }
+
+
+# ============================================================
 # POSITION SIZING
 # ============================================================
 
@@ -599,6 +702,18 @@ def main():
                 print(f"❌ No open trade for {asset}")
         else:
             print("❌ tp_level must be tp1 or tp2")
+
+    elif cmd == "drawdown":
+        result = check_drawdown()
+        if "--json" in sys.argv:
+            print(json.dumps(result, indent=2, ensure_ascii=False))
+        else:
+            print(f"\n💰 Drawdown Status")
+            print(f"   Level: {result['level']}")
+            print(f"   Drawdown: {result['drawdown_pct']:.1f}%")
+            print(f"   Daily Loss: {result['daily_loss_pct']:.1f}%")
+            print(f"   Can Trade: {'✅' if result['can_trade'] else '🚫'}")
+            print(f"   {result['message']}")
 
     elif cmd == "check":
         # Just show status of open trades

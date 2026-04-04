@@ -23,11 +23,11 @@ CHAT_ID: -1003767339297
 
 ### Paths
 ```
-Project root:  C:\Users\aggel\Desktop\trading
-Scripts:       C:\Users\aggel\Desktop\trading\GOLD_TACTIC\scripts\
-Data:          C:\Users\aggel\Desktop\trading\GOLD_TACTIC\data\
-Screenshots:   C:\Users\aggel\Desktop\trading\GOLD_TACTIC\screenshots\
-Prompts:       C:\Users\aggel\Desktop\trading\GOLD_TACTIC\prompts\
+Project root:  .
+Scripts:       .\GOLD_TACTIC\scripts\
+Data:          .\GOLD_TACTIC\data\
+Screenshots:   .\GOLD_TACTIC\screenshots\
+Prompts:       .\GOLD_TACTIC\prompts\
 ```
 
 ### Αρχεία δεδομένων
@@ -127,7 +127,6 @@ RSI < 25 ημερήσιο + sweep χαμηλών + σπάσιμο δομής π�
 ## SCRIPTS
 
 ```bash
-cd C:\Users\aggel\Desktop\trading
 python GOLD_TACTIC\scripts\price_checker.py                    → live_prices.json
 python GOLD_TACTIC\scripts\chart_generator.py [ASSET]          → screenshots/
 python GOLD_TACTIC\scripts\news_scout.py                       → news_feed.json

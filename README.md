@@ -8,11 +8,11 @@
 
 **After cloning, you MUST update the hardcoded paths in 3 prompt files.**
 
-The prompts contain `C:\Users\aggel\Desktop\trading` — replace with your actual clone path.
+The prompts contain `.` — replace with your actual clone path.
 
 **Quick way (PowerShell):**
 ```powershell
-$old = "C:\Users\aggel\Desktop\trading"
+$old = "."
 $new = "C:\YOUR\ACTUAL\PATH\trading"   # <-- change this
 
 Get-ChildItem "GOLD_TACTIC\prompts\*.md" | ForEach-Object {

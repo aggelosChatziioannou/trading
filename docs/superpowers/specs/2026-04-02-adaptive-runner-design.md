@@ -135,7 +135,7 @@ Outside active window → exit immediately (Task Scheduler fires but runner does
 7. Build prompt:
    "Εκτέλεσε cycle. Ώρα: {HH:MM} EET.
     Διάβασε: GOLD_TACTIC/prompts/{prompt_file} και εκτέλεσε ακριβώς.
-    Working dir: C:\Users\aggel\Desktop\trading"
+    Working dir: ."
 
 8. Call Claude (full path to avoid PATH issues in Task Scheduler):
    CLAUDE_CMD = find_claude_executable()  # checks known install paths
@@ -251,7 +251,7 @@ Executes **after step 18** (Απόφαση Wait Time) — the tier decision must
 |---------|-------|
 | Name | `GOLD TACTIC Runner` |
 | Trigger | Every 5 minutes, 08:00–22:00, every day |
-| Action | `python C:\Users\aggel\Desktop\trading\GOLD_TACTIC\scripts\analyst_runner.py` |
+| Action | `python GOLD_TACTIC\scripts\analyst_runner.py` |
 | If task is already running | **Skip** (do not start second instance) |
 | Run whether user is logged on or not | **No** — requires active user session (Max subscription OAuth) |
 

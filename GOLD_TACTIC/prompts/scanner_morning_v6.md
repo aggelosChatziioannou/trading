@@ -21,10 +21,10 @@ CHAT_ID: -1003767339297
 
 ### Paths
 ```
-Project root:  C:\Users\aggel\Desktop\trading
-Scripts:       C:\Users\aggel\Desktop\trading\GOLD_TACTIC\scripts\
-Data:          C:\Users\aggel\Desktop\trading\GOLD_TACTIC\data\
-Screenshots:   C:\Users\aggel\Desktop\trading\GOLD_TACTIC\screenshots\
+Project root:  .
+Scripts:       .\GOLD_TACTIC\scripts\
+Data:          .\GOLD_TACTIC\data\
+Screenshots:   .\GOLD_TACTIC\screenshots\
 ```
 
 ---
@@ -69,7 +69,6 @@ chart_set_symbol(tv_symbol) →
 
 **2b — Scripts:**
 ```bash
-cd C:\Users\aggel\Desktop\trading
 python GOLD_TACTIC\scripts\news_scout.py
 python GOLD_TACTIC\scripts\price_checker.py
 python GOLD_TACTIC\scripts\quick_scan.py --from-file --json

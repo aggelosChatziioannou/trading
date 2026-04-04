@@ -13,7 +13,7 @@
 
 ### Βήμα 1: Φέρε Νέα (ΕΚΤΕΤΑΜΕΝΟ)
 ```bash
-/c/Users/aggel/AppData/Local/Programs/Python/Python311/python.exe /c/Users/aggel/Desktop/trading/GOLD_TACTIC/news_scout.py
+python GOLD_TACTIC/news_scout.py
 ```
 
 Μετά κάνε ΠΟΛΛΑΠΛΑ WebSearch:
@@ -42,7 +42,7 @@
 
 ### Βήμα 2: Φτιάξε Charts για ΟΛΑ τα assets
 ```bash
-/c/Users/aggel/AppData/Local/Programs/Python/Python311/python.exe /c/Users/aggel/Desktop/trading/GOLD_TACTIC/chart_generator.py XAUUSD NAS100 EURUSD AAPL TSLA NVDA META AMZN MSFT GOOGL AMD INTC COIN PLTR MSTR BTC ETH SOL
+python GOLD_TACTIC/chart_generator.py XAUUSD NAS100 EURUSD AAPL TSLA NVDA META AMZN MSFT GOOGL AMD INTC COIN PLTR MSTR BTC ETH SOL
 ```
 Αυτό φτιάχνει 54 charts (18 assets × 3 timeframes). Θα πάρει ~2-3 λεπτά.
 
@@ -85,7 +85,7 @@
 - Risk factor: LOW / MEDIUM / HIGH
 
 ### Βήμα 4: Ενημέρωσε Watchlist
-Γράψε στο αρχείο `c:\Users\aggel\Desktop\trading\GOLD_TACTIC\scanner_watchlist.json`:
+Γράψε στο αρχείο `GOLD_TACTIC\scanner_watchlist.json`:
 
 ```json
 {
@@ -175,8 +175,8 @@ ETH: Ακολουθεί BTC | SOL: Χωρίς catalyst
 ### Βήμα 6: Στείλε charts στο Telegram
 Για κάθε WATCH asset, στείλε τα 3 charts:
 ```bash
-/c/Users/aggel/AppData/Local/Programs/Python/Python311/python.exe /c/Users/aggel/Desktop/trading/GOLD_TACTIC/telegram_sender.py charts NVDA
-/c/Users/aggel/AppData/Local/Programs/Python/Python311/python.exe /c/Users/aggel/Desktop/trading/GOLD_TACTIC/telegram_sender.py charts BTC
+python GOLD_TACTIC/telegram_sender.py charts NVDA
+python GOLD_TACTIC/telegram_sender.py charts BTC
 ```
 
 ## ΚΑΝΟΝΕΣ SCANNER

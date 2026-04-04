@@ -39,7 +39,7 @@
 - [ ] **Step 2: Verify file is valid JSON**
 
 ```bash
-cd c:/Users/aggel/Desktop/trading
+cd .
 python -c "import json; json.load(open('GOLD_TACTIC/data/narrative_memory.json')); print('OK')"
 ```
 Expected: `OK`
@@ -526,7 +526,7 @@ git commit -m "feat: add 📖 ΙΣΤΟΡΙΚΟ block to TIER 3 ZONE 2 per asset"
 - [ ] **Step 4: Validate narrative_memory.json is still valid JSON**
 
 ```bash
-cd c:/Users/aggel/Desktop/trading
+cd .
 python -c "import json; d=json.load(open('GOLD_TACTIC/data/narrative_memory.json')); print(f'Assets: {list(d[\"assets\"].keys())}')"
 ```
 Expected: `Assets: ['EURUSD', 'GBPUSD', 'NAS100', 'XAUUSD', 'BTC', 'SOL', 'ETH']`

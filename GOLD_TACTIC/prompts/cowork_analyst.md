@@ -3,7 +3,7 @@
 ## Setup
 - **Task ID**: `gold-tactic-trading-analyst`
 - **Schedule**: Κάθε 20 λεπτά, 8:00-22:00, Δευτέρα-Κυριακή (ΣΚ: crypto only)
-- Project: C:\Users\aggel\Desktop\trading
+- Project: .
 - Scripts: `GOLD_TACTIC\scripts\` | Data: `GOLD_TACTIC\data\` | Prompts: `GOLD_TACTIC\prompts\`
 
 ## Αρχιτεκτονική v5.0

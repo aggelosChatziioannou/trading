@@ -20,7 +20,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-DATA_DIR = Path(__file__).parent
+DATA_DIR = Path(__file__).parent.parent / "data"
 PORTFOLIO_FILE = DATA_DIR / "portfolio.json"
 HISTORY_FILE = DATA_DIR / "trade_history.json"
 

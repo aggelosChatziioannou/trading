@@ -2,7 +2,10 @@
   "mcpServers": {
     "tradingview": {
       "command": "node",
-      "args": ["C:/Users/aggel/tradingview-mcp/src/server.js"]
+      "args": [
+        "tradingview-mcp/src/server.js"
+      ],
+      "_note": "Update args[0] to your TradingView MCP server path"
     }
   }
 }

@@ -23,11 +23,11 @@ CHAT_ID: -1003767339297
 
 ### Project Directory
 ```
-Project root:  C:\Users\aggel\Desktop\trading
-Scripts:       C:\Users\aggel\Desktop\trading\GOLD_TACTIC\scripts\
-Data:          C:\Users\aggel\Desktop\trading\GOLD_TACTIC\data\
-Screenshots:   C:\Users\aggel\Desktop\trading\GOLD_TACTIC\screenshots\
-Prompts:       C:\Users\aggel\Desktop\trading\GOLD_TACTIC\prompts\
+Project root:  .
+Scripts:       .\GOLD_TACTIC\scripts\
+Data:          .\GOLD_TACTIC\data\
+Screenshots:   .\GOLD_TACTIC\screenshots\
+Prompts:       .\GOLD_TACTIC\prompts\
 ```
 
 ### Κρίσιμα αρχεία δεδομένων
@@ -275,7 +275,6 @@ TP1+TP2+Runner5x: +199€
 
 ### price_checker.py — Live τιμές
 ```bash
-cd C:\Users\aggel\Desktop\trading
 python GOLD_TACTIC\scripts\price_checker.py
 ```
 Γράφει σε `GOLD_TACTIC\data\live_prices.json`. Χρησιμοποιεί yfinance + Yahoo v8 API (dual-source).

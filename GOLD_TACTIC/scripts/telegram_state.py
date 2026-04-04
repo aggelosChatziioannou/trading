@@ -360,20 +360,19 @@ def get_wait_cycle_message(wait_cycles, expected_trigger, distance_info=""):
     Return escalating wait message based on cycle count.
 
     Avoids repeating "Waiting for BOS" 10 times in a row.
-    Instead: gradually escalates urgency.
+    Instead: gradually escalates urgency. Messages in proper Greek.
     """
     count = wait_cycles or 0
 
     if count <= 2:
-        return f"Anameno {expected_trigger}"
+        return f"\u0391\u03bd\u03b1\u03bc\u03ad\u03bd\u03c9 {expected_trigger}"
     elif count <= 4:
-        dist = f", timi {distance_info} makriya" if distance_info else ""
-        return f"{count}os kyklos — agora den edose {expected_trigger}{dist}"
+        dist = f", \u03c4\u03b9\u03bc\u03ae {distance_info} \u03bc\u03b1\u03ba\u03c1\u03b9\u03ac" if distance_info else ""
+        return f"{count}\u03bf\u03c2 \u03ba\u03cd\u03ba\u03bb\u03bf\u03c2 \u2014 \u03b1\u03b3\u03bf\u03c1\u03ac \u03b4\u03b5\u03bd \u03ad\u03b4\u03c9\u03c3\u03b5 {expected_trigger}{dist}"
     elif count <= 6:
-        return f"{count}os kyklos — arxizei na argei to {expected_trigger}"
+        return f"\u26a0\ufe0f {count}\u03bf\u03c2 \u03ba\u03cd\u03ba\u03bb\u03bf\u03c2 \u2014 \u03b1\u03c1\u03c7\u03af\u03b6\u03b5\u03b9 \u03bd\u03b1 \u03b1\u03c1\u03b3\u03b5\u03af \u03c4\u03bf {expected_trigger}"
     else:
-        # Calculate deadline: roughly EOD
-        return f"{count}os kyklos — setup pithano akyronetai"
+        return f"\u274c {count}\u03bf\u03c2 \u03ba\u03cd\u03ba\u03bb\u03bf\u03c2 \u2014 setup \u03c0\u03b9\u03b8\u03b1\u03bd\u03ac \u03b1\u03ba\u03c5\u03c1\u03ce\u03bd\u03b5\u03c4\u03b1\u03b9"
 
 
 # ══════════════════════════════════════════════════════════════════════════════

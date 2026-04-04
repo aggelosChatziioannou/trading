@@ -19,18 +19,18 @@
 ## CREDENTIALS & PATHS
 
 ### Telegram Bot
-```
-TOKEN: 8621254551:AAF3z5R-5JrAzTKaZQ31E3pmXxtlvQ10wFc
-CHAT_ID: -1003767339297
-```
+Credentials φορτώνονται αυτόματα από `.env` (project root):
+- `TELEGRAM_BOT_TOKEN` — Bot token
+- `TELEGRAM_CHANNEL` — Chat ID
+Τα scripts (telegram_sender.py) χρησιμοποιούν python-dotenv για φόρτωση.
 
 ### Paths
 ```
-Project root:  C:\Users\aggel\Desktop\trading
-Scripts:       C:\Users\aggel\Desktop\trading\GOLD_TACTIC\scripts\
-Data:          C:\Users\aggel\Desktop\trading\GOLD_TACTIC\data\
-Screenshots:   C:\Users\aggel\Desktop\trading\GOLD_TACTIC\screenshots\
-Prompts:       C:\Users\aggel\Desktop\trading\GOLD_TACTIC\prompts\
+Project root:  .
+Scripts:       .\GOLD_TACTIC\scripts\
+Data:          .\GOLD_TACTIC\data\
+Screenshots:   .\GOLD_TACTIC\screenshots\
+Prompts:       .\GOLD_TACTIC\prompts\
 ```
 
 ### Αρχεία δεδομένων
@@ -283,7 +283,6 @@ Symbols: EURUSD=FX:EURUSD, GBPUSD=FX:GBPUSD, NAS100=CAPITALCOM:US100,
 
 **2b — Scripts (ΤΗΡΗΣΕ TIER permissions — δες πίνακα παραπάνω):**
 ```bash
-cd C:\Users\aggel\Desktop\trading
 python GOLD_TACTIC\scripts\news_scout_v2.py --full --summarize    # TIER 3a μόνο (αν cache > 5')
 python GOLD_TACTIC\scripts\price_checker.py
 python GOLD_TACTIC\scripts\economic_calendar.py                    # TIER 3a μόνο (αν cache > 60')
@@ -618,7 +617,6 @@ Append 1 γραμμή JSON στο `data\session_log.jsonl`:
 ## SCRIPTS
 
 ```bash
-cd C:\Users\aggel\Desktop\trading
 python GOLD_TACTIC\scripts\price_checker.py                    → live_prices.json
 python GOLD_TACTIC\scripts\chart_generator.py [ASSET]          → screenshots/
 python GOLD_TACTIC\scripts\news_scout_v2.py                    → news_feed.json (νέες πηγές)

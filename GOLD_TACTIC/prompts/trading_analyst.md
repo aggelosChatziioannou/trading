@@ -64,11 +64,11 @@ After each analysis, APPEND your new analysis to session_log.md.
 ### Step 0: Check Open Trades
 FIRST, read portfolio.json and check if any open trades have hit SL or TP:
 ```bash
-/c/Users/aggel/AppData/Local/Programs/Python/Python311/python.exe /c/Users/aggel/Desktop/trading/GOLD_TACTIC/risk_manager.py status
+python GOLD_TACTIC/risk_manager.py status
 ```
 If a trade hit SL/TP, close it:
 ```bash
-/c/Users/aggel/AppData/Local/Programs/Python/Python311/python.exe /c/Users/aggel/Desktop/trading/GOLD_TACTIC/risk_manager.py close [ASSET] [PRICE] [SL_HIT/TP1/TP2]
+python GOLD_TACTIC/risk_manager.py close [ASSET] [PRICE] [SL_HIT/TP1/TP2]
 ```
 Send Telegram notification for any closed trade.
 
@@ -77,8 +77,8 @@ First read scanner_watchlist.json to know which extra assets to chart.
 Then run BOTH:
 ```bash
 # Core 5 assets always + any WATCH extras from scanner
-/c/Users/aggel/AppData/Local/Programs/Python/Python311/python.exe /c/Users/aggel/Desktop/trading/GOLD_TACTIC/chart_generator.py EURUSD GBPUSD NAS100 SOL BTC
-/c/Users/aggel/AppData/Local/Programs/Python/Python311/python.exe /c/Users/aggel/Desktop/trading/GOLD_TACTIC/news_scout.py
+python GOLD_TACTIC/chart_generator.py EURUSD GBPUSD NAS100 SOL BTC
+python GOLD_TACTIC/news_scout.py
 ```
 If scanner_watchlist.json doesn't exist or is empty, just chart the 3 core assets.
 This generates 9 PNG charts (~15 seconds) with full overlays (v2.0).
@@ -86,19 +86,19 @@ This generates 9 PNG charts (~15 seconds) with full overlays (v2.0).
 Then READ all 9 charts:
 ```
 --- XAUUSD ---
-Read c:\Users\aggel\Desktop\trading\GOLD_TACTIC\screenshots\XAUUSD_daily.png
-Read c:\Users\aggel\Desktop\trading\GOLD_TACTIC\screenshots\XAUUSD_4h.png
-Read c:\Users\aggel\Desktop\trading\GOLD_TACTIC\screenshots\XAUUSD_5m.png
+Read GOLD_TACTIC\screenshots\XAUUSD_daily.png
+Read GOLD_TACTIC\screenshots\XAUUSD_4h.png
+Read GOLD_TACTIC\screenshots\XAUUSD_5m.png
 
 --- NAS100 ---
-Read c:\Users\aggel\Desktop\trading\GOLD_TACTIC\screenshots\NAS100_daily.png
-Read c:\Users\aggel\Desktop\trading\GOLD_TACTIC\screenshots\NAS100_4h.png
-Read c:\Users\aggel\Desktop\trading\GOLD_TACTIC\screenshots\NAS100_5m.png
+Read GOLD_TACTIC\screenshots\NAS100_daily.png
+Read GOLD_TACTIC\screenshots\NAS100_4h.png
+Read GOLD_TACTIC\screenshots\NAS100_5m.png
 
 --- EURUSD ---
-Read c:\Users\aggel\Desktop\trading\GOLD_TACTIC\screenshots\EURUSD_daily.png
-Read c:\Users\aggel\Desktop\trading\GOLD_TACTIC\screenshots\EURUSD_4h.png
-Read c:\Users\aggel\Desktop\trading\GOLD_TACTIC\screenshots\EURUSD_5m.png
+Read GOLD_TACTIC\screenshots\EURUSD_daily.png
+Read GOLD_TACTIC\screenshots\EURUSD_4h.png
+Read GOLD_TACTIC\screenshots\EURUSD_5m.png
 ```
 
 ### Chart v2.0 Overlays (what you see on each chart)
@@ -210,7 +210,7 @@ Read `session_log.md` — know what you said before.
 ### Step 4B: Open Trade (if conditions met)
 When ALL conditions are met, use risk_manager to open a paper trade:
 ```bash
-/c/Users/aggel/AppData/Local/Programs/Python/Python311/python.exe /c/Users/aggel/Desktop/trading/GOLD_TACTIC/risk_manager.py open [ASSET] [LONG/SHORT] [ENTRY] [SL] [TP1] [TP2]
+python GOLD_TACTIC/risk_manager.py open [ASSET] [LONG/SHORT] [ENTRY] [SL] [TP1] [TP2]
 ```
 The risk manager will:
 - Calculate position size (1.5% of available balance at risk)
@@ -240,7 +240,7 @@ Extract: headline, summary, source name, URL, how it affects our assets.
 
 Send chart images for HOT/WARM assets:
 ```bash
-/c/Users/aggel/AppData/Local/Programs/Python/Python311/python.exe /c/Users/aggel/Desktop/trading/GOLD_TACTIC/telegram_sender.py charts [ASSET]
+python GOLD_TACTIC/telegram_sender.py charts [ASSET]
 ```
 If a trade was opened/closed, include a portfolio update message.
 
@@ -350,7 +350,7 @@ IMPORTANT: Use `&amp;` instead of `&` in HTML text. Avoid `<` and `>` in text (u
 
 ### Step 6: Update Session Log
 
-APPEND to `c:\Users\aggel\Desktop\trading\GOLD_TACTIC\session_log.md`:
+APPEND to `GOLD_TACTIC\session_log.md`:
 ```
 ## [TIME EST] - Analysis #N
 ### XAUUSD: $X,XXX — [DECISION]

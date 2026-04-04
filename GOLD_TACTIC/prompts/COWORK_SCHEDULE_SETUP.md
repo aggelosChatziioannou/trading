@@ -19,12 +19,12 @@
 ### 1. Scanner Morning
 - **Όνομα:** Gold tactic scanner morning
 - **Πότε:** Κάθε μέρα Δευτ-Παρ, **1 φορά στις 08:00 EET**
-- **Prompt:** Αντέγραψε ολόκληρο το `C:\Users\aggel\Desktop\trading\GOLD_TACTIC\prompts\scanner_morning_v6.md`
+- **Prompt:** Αντέγραψε ολόκληρο το `.\GOLD_TACTIC\prompts\scanner_morning_v6.md`
 
 ### 2. Analyst PRIME (London Killzone)
 - **Όνομα:** Gold tactic analyst PRIME
 - **Πότε:** Κάθε μέρα Δευτ-Παρ, **κάθε 15 λεπτά, 08:15 - 11:00 EET**
-- **Prompt:** Αντέγραψε ολόκληρο το `C:\Users\aggel\Desktop\trading\GOLD_TACTIC\prompts\analyst_core_v6.md`
+- **Prompt:** Αντέγραψε ολόκληρο το `.\GOLD_TACTIC\prompts\analyst_core_v6.md`
 
 ### 3. Analyst MIDDAY (Monitoring)
 - **Όνομα:** Gold tactic analyst MIDDAY
@@ -34,7 +34,7 @@
 ### 4. Scanner Afternoon
 - **Όνομα:** Gold tactic scanner afternoon
 - **Πότε:** Κάθε μέρα Δευτ-Παρ, **1 φορά στις 15:30 EET**
-- **Prompt:** Αντέγραψε ολόκληρο το `C:\Users\aggel\Desktop\trading\GOLD_TACTIC\prompts\scanner_afternoon_v6.md`
+- **Prompt:** Αντέγραψε ολόκληρο το `.\GOLD_TACTIC\prompts\scanner_afternoon_v6.md`
 
 ### 5. Analyst PRIME 2 (NY Open + IB)
 - **Όνομα:** Gold tactic analyst NY

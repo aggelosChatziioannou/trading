@@ -21,9 +21,9 @@ CHAT_ID: -1003767339297
 
 ### Paths
 ```
-Project root:  C:\Users\aggel\Desktop\trading
-Scripts:       C:\Users\aggel\Desktop\trading\GOLD_TACTIC\scripts\
-Data:          C:\Users\aggel\Desktop\trading\GOLD_TACTIC\data\
+Project root:  .
+Scripts:       .\GOLD_TACTIC\scripts\
+Data:          .\GOLD_TACTIC\data\
 ```
 
 ---
@@ -42,7 +42,6 @@ Data:          C:\Users\aggel\Desktop\trading\GOLD_TACTIC\data\
 ## ΒΗΜΑ 2 — SCRIPTS
 
 ```bash
-cd C:\Users\aggel\Desktop\trading
 python GOLD_TACTIC\scripts\price_checker.py
 python GOLD_TACTIC\scripts\news_scout.py
 ```

@@ -1,5 +1,8 @@
-# Environment variables
+# Environment variables (contain secrets — NEVER commit)
+.env
 .env.local
+.env.*
+!.env.example
 
 # Python
 __pycache__/
@@ -59,8 +62,21 @@ GOLD_TACTIC/data/trade_journal.md
 GOLD_TACTIC/screenshots/charts_meta.json
 GOLD_TACTIC/archive/
 GOLD_TACTIC/scripts/__pycache__/
+GOLD_TACTIC/scripts/portfolio.json
 GOLD_TACTIC/news_feed.json
 GOLD_TACTIC/opportunities.json
+
+# GOLD_TACTIC — runtime logs and temp files
+GOLD_TACTIC/data/briefing_log.md
+GOLD_TACTIC/data/telegram_briefing_log.md
+GOLD_TACTIC/data/schedule_log.jsonl
+GOLD_TACTIC/data/trade_journal.jsonl
+GOLD_TACTIC/data/trs_history.jsonl
+GOLD_TACTIC/data/tier_c_msg_temp.txt
+GOLD_TACTIC/data/review/
+
+# Claude Code internal
+.claude/worktrees/
 
 # Runtime generated docs (plans/specs created during execution)
 docs/superpowers/plans/*

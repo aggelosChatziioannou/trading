@@ -83,6 +83,63 @@ ASSETS = {
         "price_fmt": ",.0f",
         "strategy": "TJR",       # +6.4% backtest, 58.3% WR
     },
+    # ---- Extended Assets ----
+    "XAUUSD": {
+        "yf_symbol": "GC=F",
+        "display_name": "XAUUSD (Gold)",
+        "is_forex": False,
+        "adr_typical": 30.0,
+        "price_fmt": ",.2f",
+        "strategy": "TJR",
+    },
+    "ETH": {
+        "yf_symbol": "ETH-USD",
+        "display_name": "ETH (Ethereum)",
+        "is_forex": False,
+        "adr_typical": 80.0,
+        "price_fmt": ",.2f",
+        "strategy": "TJR",
+    },
+    "XRP": {
+        "yf_symbol": "XRP-USD",
+        "display_name": "XRP (Ripple)",
+        "is_forex": False,
+        "adr_typical": 0.08,
+        "price_fmt": ".4f",
+        "strategy": "TJR",
+    },
+    "USDJPY": {
+        "yf_symbol": "JPY=X",
+        "display_name": "USDJPY",
+        "is_forex": True,
+        "adr_typical": 0.80,
+        "price_fmt": ".3f",
+        "strategy": "TJR",
+    },
+    "AUDUSD": {
+        "yf_symbol": "AUDUSD=X",
+        "display_name": "AUDUSD",
+        "is_forex": True,
+        "adr_typical": 0.0055,
+        "price_fmt": ".4f",
+        "strategy": "TJR",
+    },
+    "SPX500": {
+        "yf_symbol": "ES=F",
+        "display_name": "SPX500 (S&P 500)",
+        "is_forex": False,
+        "adr_typical": 50.0,
+        "price_fmt": ",.2f",
+        "strategy": "IBB",
+    },
+    "DXY": {
+        "yf_symbol": "DX-Y.NYB",
+        "display_name": "DXY (Dollar Index)",
+        "is_forex": False,
+        "adr_typical": 0.6,
+        "price_fmt": ".3f",
+        "strategy": "TJR",
+    },
 }
 
 TIMEFRAMES = {

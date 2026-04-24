@@ -16,6 +16,7 @@ import json
 import sys
 import os
 import traceback
+import urllib.request
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -50,19 +51,28 @@ except ImportError as e:
 ASSETS = {
     "EURUSD": {"yf": "EURUSD=X", "adr_typical": 0.0080, "pip_size": 0.0001},
     "GBPUSD": {"yf": "GBPUSD=X", "adr_typical": 0.0100, "pip_size": 0.0001},
-    "NAS100": {"yf": "^NDX",     "adr_typical": 400,     "pip_size": 1.0},
+    "USDJPY": {"yf": "JPY=X",    "adr_typical": 0.80,    "pip_size": 0.01},
+    "AUDUSD": {"yf": "AUDUSD=X", "adr_typical": 0.0060,  "pip_size": 0.0001},
+    "NAS100": {"yf": "NQ=F",     "adr_typical": 400,     "pip_size": 1.0},
+    "SPX500": {"yf": "ES=F",     "adr_typical": 80,      "pip_size": 0.25},
     "SOL":    {"yf": "SOL-USD",  "adr_typical": 6.0,     "pip_size": 0.01},
     "BTC":    {"yf": "BTC-USD",  "adr_typical": 2000,    "pip_size": 1.0},
-    "XAUUSD": {"yf": "GC=F",    "adr_typical": 30,      "pip_size": 0.01},
-    "DXY":    {"yf": "DX-Y.NYB","adr_typical": 0.6,     "pip_size": 0.01},
     "ETH":    {"yf": "ETH-USD",  "adr_typical": 80,      "pip_size": 0.01},
+    "XRP":    {"yf": "XRP-USD",  "adr_typical": 0.08,    "pip_size": 0.0001},
+    "XAUUSD": {"yf": "GC=F",     "adr_typical": 30,      "pip_size": 0.01},
+    "DXY":    {"yf": "DX-Y.NYB", "adr_typical": 0.6,     "pip_size": 0.01},
 }
 
 
 CORRELATION_PAIRS = [
     ("EURUSD", "GBPUSD"),
+    ("AUDUSD", "EURUSD"),
     ("BTC", "SOL"),
+    ("BTC", "ETH"),
     ("NAS100", "BTC"),
+    ("SPX500", "NAS100"),
+    ("DXY", "EURUSD"),
+    ("XAUUSD", "DXY"),
 ]
 
 
@@ -286,6 +296,24 @@ def scan_asset(name, config, tv_data=None):
         result["adx"] = regime["adx"]
         result["volume_ratio"] = compute_volume_ratio(daily)
 
+        # #9 Fog of War — weekly/monthly range position
+        try:
+            if len(daily) >= 20:
+                monthly_high = float(daily['High'].tail(20).max())
+                monthly_low  = float(daily['Low'].tail(20).min())
+                monthly_rng  = monthly_high - monthly_low
+                price        = result["price"]
+                if monthly_rng > 0:
+                    monthly_pct = round((price - monthly_low) / monthly_rng * 100, 1)
+                    result["range_position"] = {
+                        "monthly_high": round(monthly_high, 5),
+                        "monthly_low":  round(monthly_low, 5),
+                        "monthly_pct":  monthly_pct,
+                        "zone": "TOP" if monthly_pct > 80 else ("BOTTOM" if monthly_pct < 20 else "MID"),
+                    }
+        except Exception:
+            pass
+
     except Exception as e:
         result["error"] = str(e)
         log_error(f"quick_scan-{name}", f"{type(e).__name__}: {e}\n{traceback.format_exc()}")
@@ -404,6 +432,53 @@ def compute_changes(prev_scan, new_scan):
     }
 
 
+def fetch_sentiment():
+    """Fetch market sentiment: Crypto Fear & Greed Index + VIX.
+    Both sources are free with no API key required.
+    Returns dict added to quick_scan.json under 'sentiment' key.
+    """
+    sentiment = {}
+
+    # --- Crypto Fear & Greed Index (api.alternative.me, no key needed) ---
+    try:
+        req = urllib.request.Request(
+            "https://api.alternative.me/fng/?limit=1",
+            headers={"User-Agent": "Mozilla/5.0"}
+        )
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = json.loads(resp.read().decode())
+        fng = data["data"][0]
+        sentiment["fear_greed_value"] = int(fng["value"])
+        sentiment["fear_greed_label"] = fng["value_classification"]
+    except Exception as e:
+        log_error("sentiment-fng", str(e))
+        sentiment["fear_greed_value"] = None
+        sentiment["fear_greed_label"] = None
+
+    # --- VIX (via yfinance, already imported) ---
+    try:
+        vix_df = yf.download("^VIX", period="2d", interval="1d", progress=False)
+        if isinstance(vix_df.columns, pd.MultiIndex):
+            vix_df.columns = vix_df.columns.get_level_values(0)
+        sentiment["vix"] = round(float(vix_df['Close'].iloc[-1]), 2) if not vix_df.empty else None
+    except Exception as e:
+        log_error("sentiment-vix", str(e))
+        sentiment["vix"] = None
+
+    # --- Derive composite market regime ---
+    vix = sentiment.get("vix")
+    fng = sentiment.get("fear_greed_value")
+    if vix is not None and vix > 30:
+        regime = "RISK_OFF"
+    elif vix is not None and vix < 16 and fng is not None and fng > 60:
+        regime = "RISK_ON"
+    else:
+        regime = "NEUTRAL"
+    sentiment["market_regime"] = regime
+
+    return sentiment
+
+
 def main():
     args = sys.argv[1:]
     json_mode = "--json" in args
@@ -411,7 +486,7 @@ def main():
     from_file = "--from-file" in args
     args = [a for a in args if a not in ("--json", "--changes", "--from-file")]
 
-    assets_to_scan = args if args else ["EURUSD", "GBPUSD", "NAS100", "SOL", "BTC", "DXY"]
+    assets_to_scan = args if args else list(ASSETS.keys())
 
     output_file = OUTPUT_DIR / "quick_scan.json"
     corr_file = OUTPUT_DIR / "correlation_matrix.json"
@@ -464,50 +539,24 @@ def main():
             "adx": adx_values,
         }, f, indent=2)
 
-    # FIX #5: Drawdown integration — available in every TIER
-    drawdown_info = None
-    try:
-        sys.path.insert(0, str(Path(__file__).parent))
-        from risk_manager import check_drawdown
-        drawdown_info = check_drawdown()
-    except Exception as e:
-        log_error("quick_scan-drawdown", f"Could not check drawdown: {e}")
-        drawdown_info = {"level": "SAFE", "can_trade": True, "drawdown_pct": 0.0, "daily_loss_pct": 0.0, "message": "Drawdown check unavailable"}
-
-    # FIX #12: VIX overlay
-    vix_info = None
-    try:
-        vix_df = yf.download("^VIX", period="5d", interval="1d", progress=False)
-        if isinstance(vix_df.columns, pd.MultiIndex):
-            vix_df.columns = vix_df.columns.get_level_values(0)
-        if not vix_df.empty and len(vix_df) >= 2:
-            vix_level = float(vix_df['Close'].iloc[-1])
-            vix_prev = float(vix_df['Close'].iloc[-2])
-            vix_change = round(vix_level - vix_prev, 2)
-
-            if vix_level > 30:
-                vix_regime = "EXTREME_FEAR"
-            elif vix_level > 20:
-                vix_regime = "FEAR"
-            elif vix_level < 15:
-                vix_regime = "COMPLACENT"
-            else:
-                vix_regime = "NEUTRAL"
-
-            vix_info = {
-                "vix_level": round(vix_level, 2),
-                "vix_change": vix_change,
-                "vix_regime": vix_regime,
-            }
-    except Exception as e:
-        log_error("quick_scan-vix", f"VIX fetch failed: {e}")
+    # --- #3: Sentiment (Fear & Greed + VIX) ---
+    if not json_mode:
+        print("\nFetching sentiment indicators...")
+    sentiment = fetch_sentiment()
+    if not json_mode:
+        fng_val = sentiment.get("fear_greed_value")
+        fng_lbl = sentiment.get("fear_greed_label", "N/A")
+        vix_val = sentiment.get("vix")
+        regime  = sentiment.get("market_regime", "NEUTRAL")
+        fng_str = f"{fng_val} ({fng_lbl})" if fng_val is not None else "N/A"
+        vix_str = f"{vix_val}" if vix_val is not None else "N/A"
+        print(f"🌡️  Fear & Greed: {fng_str} | VIX: {vix_str} | Regime: {regime}")
 
     new_scan = {
         "scan_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "assets": results,
         "correlations": correlations,
-        "drawdown": drawdown_info,
-        "vix": vix_info,
+        "sentiment": sentiment,
     }
 
     # Always save the fresh scan

@@ -36,10 +36,10 @@ env_path = Path(__file__).parent.parent.parent / ".env"
 if env_path.exists():
     load_dotenv(env_path)
 
-FINNHUB_API_KEY = os.environ.get('FINNHUB_API_KEY')
-if not FINNHUB_API_KEY:
-    raise ValueError("FINNHUB_API_KEY must be set in .env")
+FINNHUB_API_KEY = os.environ.get('FINNHUB_API_KEY', '')
 CRYPTOPANIC_API_KEY = os.environ.get('CRYPTOPANIC_API_KEY', '')
+# FINNHUB is optional — only required for full scan, not --light mode.
+# Functions that need it will check and skip/warn if missing.
 
 GOOGLE_NEWS_QUERIES = {
     "EURUSD": "EURUSD+OR+%22EUR+USD%22+forex",

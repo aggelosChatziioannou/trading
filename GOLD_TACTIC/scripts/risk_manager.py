@@ -58,6 +58,8 @@ ASSET_CONFIG = {
         "pip_size": 0.0001,
         "contract_size": 100000,
         "margin_per_lot": 330,
+        "max_sl_pct_4h": 0.30,
+        "typical_sl_pct_4h": 0.18,
     },
     "GBPUSD": {
         "pip_value_per_lot": 10.0,
@@ -65,6 +67,8 @@ ASSET_CONFIG = {
         "pip_size": 0.0001,
         "contract_size": 100000,
         "margin_per_lot": 400,
+        "max_sl_pct_4h": 0.35,
+        "typical_sl_pct_4h": 0.22,
     },
     "NAS100": {
         "pip_value_per_lot": 1.0,
@@ -72,6 +76,8 @@ ASSET_CONFIG = {
         "pip_size": 1.0,
         "contract_size": 1,
         "margin_per_lot": 500,
+        "max_sl_pct_4h": 0.60,
+        "typical_sl_pct_4h": 0.35,
     },
     "SOL": {
         "pip_value_per_lot": 1.0,
@@ -79,6 +85,8 @@ ASSET_CONFIG = {
         "pip_size": 0.01,
         "contract_size": 1,
         "margin_per_lot": 50,
+        "max_sl_pct_4h": 1.50,
+        "typical_sl_pct_4h": 1.00,
     },
     "BTC": {
         "pip_value_per_lot": 1.0,
@@ -86,6 +94,8 @@ ASSET_CONFIG = {
         "pip_size": 1.0,
         "contract_size": 1,
         "margin_per_lot": 3000,
+        "max_sl_pct_4h": 1.00,
+        "typical_sl_pct_4h": 0.60,
     },
     # ---- Scanner extras (stocks etc) ----
     "XAUUSD": {
@@ -94,6 +104,8 @@ ASSET_CONFIG = {
         "pip_size": 0.10,
         "contract_size": 100,
         "margin_per_lot": 2000,
+        "max_sl_pct_4h": 0.50,
+        "typical_sl_pct_4h": 0.25,
     },
 }
 
@@ -295,6 +307,151 @@ def calculate_position_size(portfolio, asset, entry_price, sl_price):
     }, None
 
 
+def suggest_tp_sl(asset, entry_price, direction, atr_4h=None, sl_mode="typical"):
+    """
+    Deterministic TP/SL calculator for 4h day trading.
+
+    Priority for SL distance:
+    1. If atr_4h provided → SL = 1.5 × ATR_4h (calibrated to 4h volatility)
+    2. Else → SL = typical_sl_pct_4h × entry / 100 (fallback from ASSET_CONFIG)
+    3. Final clamp: [0.5 × typical_abs, max_sl_pct_4h × entry / 100]
+
+    sl_mode multiplier on the base:
+      "tight"   → × 0.75 (fast reversal expected, narrow kill-zone)
+      "typical" → × 1.00 (default)
+      "wide"    → × 1.40 (volatile, post-news, wider range)
+
+    Reward: TP1 = entry ± 1× SL_distance, TP2 = entry ± 2× SL_distance.
+
+    Returns dict:
+      {ok, sl, tp1, tp2, sl_distance, sl_pct, tp1_pct, tp2_pct, method, rationale, mode}
+    Or {ok: False, error: "..."} on failure.
+    """
+    direction = (direction or "").upper()
+    if direction not in ("LONG", "SHORT"):
+        return {"ok": False, "error": f"direction must be LONG|SHORT (got {direction})"}
+
+    config = ASSET_CONFIG.get(asset)
+    if not config:
+        return {"ok": False, "error": f"Unknown asset: {asset}"}
+
+    if entry_price <= 0:
+        return {"ok": False, "error": "Invalid entry price"}
+
+    mode_mult = {"tight": 0.75, "typical": 1.0, "wide": 1.4}.get(sl_mode, 1.0)
+
+    typical_pct = config.get("typical_sl_pct_4h", 0.25)
+    max_pct = config.get("max_sl_pct_4h", 0.50)
+    min_pct = typical_pct * 0.5
+
+    min_abs = entry_price * (min_pct / 100)
+    max_abs = entry_price * (max_pct / 100)
+    typical_abs = entry_price * (typical_pct / 100)
+
+    if atr_4h and atr_4h > 0:
+        base = 1.5 * float(atr_4h)
+        method = "atr"
+    else:
+        base = typical_abs
+        method = "pct_fallback"
+
+    sl_distance = base * mode_mult
+    clamped = False
+    if sl_distance > max_abs:
+        sl_distance = max_abs
+        clamped = True
+    elif sl_distance < min_abs:
+        sl_distance = min_abs
+        clamped = True
+
+    # Determine rounding precision from pip_size (e.g. 0.0001 → 5, 0.10 → 2, 1.0 → 2)
+    pip_size = config.get("pip_size", 0.0001)
+    pip_str = f"{pip_size:.10f}".rstrip('0').rstrip('.')
+    if '.' in pip_str:
+        decimals = len(pip_str.split('.')[-1]) + 1  # one more for sub-pip precision
+    else:
+        decimals = 2  # integer pip_size (BTC=1, NAS100=1) → 2 decimals for readability
+
+    def _round(v):
+        return round(v, decimals)
+
+    # Round SL inward (tighter) so post-rounding distance never exceeds cap
+    if direction == "LONG":
+        import math
+        sl_raw = entry_price - sl_distance
+        sl = round(math.ceil(sl_raw * (10 ** decimals)) / (10 ** decimals), decimals)
+        # recompute distance after rounding, recompute TPs based on ROUNDED distance
+        sl_distance = entry_price - sl
+        tp1 = _round(entry_price + sl_distance)
+        tp2 = _round(entry_price + 2 * sl_distance)
+    else:
+        import math
+        sl_raw = entry_price + sl_distance
+        sl = round(math.floor(sl_raw * (10 ** decimals)) / (10 ** decimals), decimals)
+        sl_distance = sl - entry_price
+        tp1 = _round(entry_price - sl_distance)
+        tp2 = _round(entry_price - 2 * sl_distance)
+
+    sl_pct = round((sl_distance / entry_price) * 100, 2)
+    tp1_pct = sl_pct
+    tp2_pct = round(sl_pct * 2, 2)
+
+    rationale = (
+        f"{method}:{'1.5×ATR' if method == 'atr' else f'{typical_pct:.2f}% typical'}"
+        f"× {sl_mode}({mode_mult:.2f})"
+        f" = SL {sl_pct:.2f}% (cap {max_pct:.2f}%)"
+        f"{' CLAMPED' if clamped else ''}"
+    )
+
+    return {
+        "ok": True,
+        "sl": sl,
+        "tp1": tp1,
+        "tp2": tp2,
+        "sl_distance": _round(sl_distance),
+        "sl_pct": sl_pct,
+        "tp1_pct": tp1_pct,
+        "tp2_pct": tp2_pct,
+        "method": method,
+        "mode": sl_mode,
+        "clamped": clamped,
+        "rationale": rationale,
+    }
+
+
+def validate_sl_distance(asset, entry_price, sl_price):
+    """
+    Validate SL distance against 4h day-trading caps defined in ASSET_CONFIG.
+    Prevents swing-scale stops being used on 4h hold windows.
+    Returns: (ok: bool, message: str, sl_pct: float)
+    """
+    config = ASSET_CONFIG.get(asset)
+    if not config:
+        return False, f"Unknown asset: {asset}", 0.0
+
+    if entry_price <= 0:
+        return False, "Invalid entry price", 0.0
+
+    sl_distance = abs(entry_price - sl_price)
+    sl_pct = (sl_distance / entry_price) * 100
+
+    max_pct = config.get("max_sl_pct_4h")
+    typical_pct = config.get("typical_sl_pct_4h")
+
+    if max_pct is None:
+        return True, f"No 4h cap configured for {asset}", sl_pct
+
+    # Tolerance: 0.01% absolute to absorb float rounding at the cap edge
+    if sl_pct > max_pct + 0.01:
+        return False, (
+            f"SL {sl_pct:.2f}% > 4h cap {max_pct:.2f}% for {asset}. "
+            f"Swing-scale stop on 4h window. Tighten SL or downgrade to Tier B. "
+            f"Typical: {typical_pct:.2f}%."
+        ), sl_pct
+
+    return True, f"SL {sl_pct:.2f}% within 4h cap {max_pct:.2f}%", sl_pct
+
+
 # ============================================================
 # TRADE OPERATIONS
 # ============================================================
@@ -314,6 +471,11 @@ def open_trade(portfolio, asset, direction, entry, sl, tp1, tp2):
     for t in portfolio["open_trades"]:
         if t["asset"] == asset:
             return None, f"Ήδη ανοιχτό trade στο {asset}"
+
+    # 4h SL sanity check — blocks swing-scale stops on day-trading window
+    ok, sl_msg, sl_pct = validate_sl_distance(asset, entry, sl)
+    if not ok:
+        return None, f"SL REJECTED: {sl_msg}"
 
     # Calculate position size
     sizing, error = calculate_position_size(portfolio, asset, entry, sl)

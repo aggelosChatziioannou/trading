@@ -284,18 +284,20 @@ def detect_cli(preferred=None):
         str(Path.home() / "AppData/Local/Programs/Python/Python311/Scripts/kimi.exe"),
     ]
 
-    if choice == "claude" or choice is None:
-        path = find_executable("claude", claude_candidates)
-        if path:
-            return "claude", path
-    if choice == "kimi" or choice is None:
-        path = find_executable("kimi", kimi_candidates)
-        if path:
-            return "kimi", path
+    # Explicit choice: fail loudly if missing, do NOT silently fall back.
     if choice == "claude":
+        path = find_executable("claude", claude_candidates)
+        return ("claude", path) if path else (None, None)
+    if choice == "kimi":
         path = find_executable("kimi", kimi_candidates)
-        if path:
-            return "kimi", path
+        return ("kimi", path) if path else (None, None)
+    # Auto mode: try claude first, then kimi.
+    path = find_executable("claude", claude_candidates)
+    if path:
+        return "claude", path
+    path = find_executable("kimi", kimi_candidates)
+    if path:
+        return "kimi", path
     return None, None
 
 

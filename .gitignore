@@ -1,8 +1,7 @@
-# Environment variables (contain secrets — NEVER commit)
-.env
+# Environment variables
+# .env is committed — contains only free Telegram API credentials (no billing keys)
 .env.local
-.env.*
-!.env.example
+.env.secret
 
 # Python
 __pycache__/

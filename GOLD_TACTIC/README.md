@@ -66,9 +66,7 @@ GOLD_TACTIC/
 │   ├── quick_scan.py          # Technical analysis (RSI, ADR, bias)
 │   ├── economic_calendar.py   # Economic events calendar
 │   ├── telegram_sender.py     # Telegram message sender
-│   └── schtasks/
-│       ├── gt-asset-selector.cmd
-│       └── gt-market-monitor.cmd
+│   └── trade_manager.py        # Trade lifecycle CLI (open/close/tick/suggest)
 ├── data/
 │   ├── master_assets.json     # 12 assets with strategies
 │   ├── selected_assets.json   # Current top 4 (auto-generated)
@@ -87,16 +85,17 @@ GOLD_TACTIC/
 ## Setup
 
 ### Prerequisites
-- Windows 11 with Claude Code CLI installed
+- Windows 11 with Claude Code Desktop (Pro subscription)
 - Python 3.10+ with: `yfinance`, `pandas`, `numpy`
-- API keys in `.env`: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHANNEL`, `FINNHUB_API_KEY`
-- Computer must stay ON (schedules run locally)
+- `.env` file in repo root with: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHANNEL`
+- Computer must stay ON — schedules run inside Claude Code Desktop
 
 ### Installation
-1. Open a Claude Cowork session
-2. Paste the contents of `SCHEDULE_SETUP.md`
-3. Claude will create 7 Windows scheduled tasks automatically
-4. Verify: check Telegram for first messages
+1. `git clone https://github.com/aggelosChatziioannou/trading.git`
+2. Open a Claude Cowork session in the project folder
+3. Paste the contents of `SCHEDULE_SETUP.md`
+4. The Cowork agent will create 8 Claude app scheduled tasks automatically
+5. Verify: check Telegram for first messages
 
 ### Manual Test
 ```bash

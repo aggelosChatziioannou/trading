@@ -2,7 +2,10 @@
 """
 GOLD TACTIC — Analyst Runner (Dual Runtime: Claude + Kimi)
 Heartbeat: checks next_cycle.json and calls the preferred AI CLI when scheduled.
-Called every 5 minutes by Windows Task Scheduler.
+Called by a Claude Code Desktop scheduled task (remote trigger) or manually.
+
+NOTE: The primary scheduling mechanism is Claude Code Desktop scheduled tasks
+(configured via SCHEDULE_SETUP.md / CronCreate). Windows Task Scheduler is NOT used.
 
 Usage:
   python analyst_runner.py              # Auto-detect available CLI

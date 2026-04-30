@@ -89,10 +89,15 @@ For each of the 12 assets in `master_assets.json`, calculate:
 | Strategy applicable now | 0-2 | Setup forming=2, possible=1, no setup=0 |
 | Market hours appropriate | 0-1 | Market open now/soon=1, closed=0 |
 
-**Skip conditions (auto score = 0):**
-- Forex/indices on weekend
-- Index outside 16:00-23:00 EET window
-- ADR consumed > 95%
+**Status flags (αντί για skip):** Κάθε asset παίρνει ένα από τρία `status`:
+
+| Συνθήκη | `status` | Score impact |
+|---|---|---|
+| ADR consumed > 120% **OR** weekend για forex/indices **OR** market κλειστή >24h | `blocked` | score → 0, **όχι** trade |
+| ADR consumed 95-120% **OR** index outside 16:00-23:00 EET (weekday) **OR** alignment≤MIXED + News contra | `monitoring_only` | score αμετάβλητο, αλλά **όχι** auto-open trade |
+| All else | `tradeable` | score αμετάβλητο, full Tier C eligibility |
+
+**Σημαντικό:** ΔΕΝ κόβουμε πια κανένα asset από την κατάταξη. Τα blocked/monitoring εμφανίζονται στα top-4 αν έχουν τα ψηλότερα scores — απλά δεν ανοίγουμε trade πάνω τους. Ο user βλέπει τι κάνει η αγορά.
 
 ---
 
@@ -123,9 +128,16 @@ python GOLD_TACTIC/scripts/reflection_logger.py recent --symbol <SYM> --limit 3
 
 ---
 
-## STEP 5 — Select Top 4
+## STEP 5 — Select Top 4 (ΠΑΝΤΑ 4)
 
-Sort by score descending. Pick top 4 (score >= 4 minimum). If fewer than 4 qualify, select only the qualified ones.
+**Νέα φιλοσοφία:** Sort by score descending, **ΠΑΝΤΑ pick top 4** ανεξάρτητα από thresholds. Ακόμα κι αν όλα τα assets έχουν score=0, παίρνεις τα 4 με τον λιγότερο κακό συνδυασμό κριτηρίων. Ο user θέλει να βλέπει τι κάνει η αγορά κάθε στιγμή — κι ας μην μπει σε καμία θέση.
+
+Κάθε επιλεγμένο asset φέρει status flag (από STEP 4):
+- `tradeable` — Monitor μπορεί να ανοίξει auto-trade
+- `monitoring_only` — Monitor βλέπει + reports + TRS, αλλά **δεν ανοίγει trade**
+- `blocked` — Monitor εμφανίζει "🛑 Blocked: <reason>" στο card, καμία action
+
+Αν όλα τα top 4 βγαίνουν `monitoring_only` ή `blocked` → καθαρό σήμα "extreme market day, full pause" — αλλά συνεχίζεις να βλέπεις live data.
 
 Write `GOLD_TACTIC/data/selected_assets.json`:
 ```json
@@ -136,19 +148,48 @@ Write `GOLD_TACTIC/data/selected_assets.json`:
     {
       "symbol": "XAUUSD",
       "score": 9,
+      "status": "tradeable",
       "direction_bias": "BUY",
       "reason": "Trend bull, Fed dovish signals, ADR 45%",
       "strategy": "Breakout / Trend Following",
       "key_level": 3260,
       "what_to_watch": "Break above 3260 for long entry"
+    },
+    {
+      "symbol": "EURUSD",
+      "score": 3,
+      "status": "monitoring_only",
+      "block_reason": "ADR consumed 102% — post-CPI extreme move",
+      "direction_bias": "SELL",
+      "reason": "Bearish alignment but ADR exhausted — watch for tomorrow",
+      "strategy": "Pullback / Wait",
+      "key_level": 1.0850,
+      "what_to_watch": "Watch only — no entry until ADR resets"
+    },
+    {
+      "symbol": "BTC",
+      "score": 0,
+      "status": "blocked",
+      "block_reason": "ADR consumed 145% — extreme volatility, capital protection",
+      "direction_bias": "—",
+      "reason": "—",
+      "strategy": "—",
+      "key_level": null,
+      "what_to_watch": "Wait for normalcy"
     }
   ],
-  "dropped": [
-    {"symbol": "NAS100", "score": 3, "reason": "Market closed until 16:30"}
+  "excluded_below_top4": [
+    {"symbol": "DXY", "score": -1, "reason": "Lowest score — not in top-4 watch list"}
   ],
-  "market_context": "London session active, DXY weak at 99.5, 2 high-impact events today"
+  "market_context": "London session active, DXY weak at 99.5, 2 high-impact events today. Mode: 1 tradeable / 1 monitoring / 1 blocked (post-FOMC)."
 }
 ```
+
+**Schema notes:**
+- `status` πεδίο **υποχρεωτικό** σε κάθε `selected[]` entry
+- `block_reason` υποχρεωτικό όταν `status != "tradeable"`, αλλιώς απουσιάζει
+- Παλιό πεδίο `dropped` έγινε `excluded_below_top4` — αυτά είναι τα assets που **δεν** μπήκαν στα top-4 (χαμηλότερο score)
+- Τα `monitoring_only` / `blocked` ΕΙΝΑΙ μέσα στα `selected` (top-4), όχι στα excluded
 
 ---
 

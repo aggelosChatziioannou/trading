@@ -775,6 +775,27 @@ ForexLive · CoinDesk · Reuters · Investing · Reddit · ZeroHedge · MarketWa
 - Strong move (Δp>±1%) → "Μεγάλη κίνηση {direction} — αλλάζει τη δυναμική"
 - Recent news → "Νέα: {1-φράση επίδραση}"
 
+**Status badge (NEW — από v7.2 top-4-always):** Διάβασε το `selected_assets.json::selected[i].status` για κάθε companion asset και πρόσθεσε **prefix badge** πριν το symbol:
+
+| Status | Badge | Behavior |
+|---|---|---|
+| `tradeable` | (κανένα) | Standard rendering όπως πάνω |
+| `monitoring_only` | 👁️ | Add insight line: `<i>👁️ Monitoring only: {block_reason}</i>` |
+| `blocked` | 🛑 | Add insight line: `<i>🛑 Blocked: {block_reason}</i>` — δεν εμφανίζεις TRS criteria, μόνο symbol+price+block_reason |
+
+Παράδειγμα blocked:
+```
+🛑 <b>BTC</b> · <code>$132,420</code> <i>(+2.3%)</i>
+   <i>🛑 Blocked: ADR 145% consumed — extreme post-FOMC volatility</i>
+```
+
+Παράδειγμα monitoring_only:
+```
+👁️ <b>EURUSD</b> 3/5 · 📈 LONG · <code>1.1839</code> <i>(+0.05%)</i>
+   ✅TF ❌RSI ✅ADR ✅News ❌Key
+   <i>👁️ Monitoring only: ADR 102% — περιμένουμε ADR reset για re-evaluation</i>
+```
+
 #### 5.C.3 — Embedded Mode (για Tier A/L2 με open trade)
 
 Όταν υπάρχει open trade και τρέχει L1 PULSE ή L2 WATCH cycle:
@@ -1021,7 +1042,21 @@ python GOLD_TACTIC/scripts/trade_manager.py suggest <SYMBOL> <LONG|SHORT> <ENTRY
 
 ## STEP 5.7 — Auto-Open Paper Trade (Tier C ΜΟΝΟ, με Probe/Confirm logic)
 
-Αν το cycle εκδίδει **Tier C signal** (δηλαδή TRS≥4 ΚΑΙ όλα τα gates STEP 4.8 πέρασαν) τότε **αμέσως** μετά το send του Tier C message, **διαλέγεις το σωστό `--tag`**:
+### 🚦 Status Gate (NEW — από v7.2 top-4-always selector)
+
+**Πριν** οποιοδήποτε auto-open, διάβασε το `selected_assets.json::selected[i].status` για το asset του signal:
+
+| Status | Action |
+|---|---|
+| `tradeable` | ✅ Συνέχισε με κανονικό auto-open flow παρακάτω |
+| `monitoring_only` | ❌ **SKIP auto-open**. Στείλε Tier C message ως **L3 SETUP only** ("watch — selector flagged monitoring-only λόγω: {block_reason}"). Καμία trade execution. |
+| `blocked` | ❌ **HARD SKIP**. Downgrade Tier C → L2 WATCH με banner: `🛑 Blocked by selector: {block_reason}`. Καμία trade. |
+
+Αν το `status` πεδίο λείπει (legacy selected_assets.json από πριν την αναβάθμιση) → treat as `tradeable` για backward compat.
+
+---
+
+Αν το cycle εκδίδει **Tier C signal** (δηλαδή TRS≥4 ΚΑΙ όλα τα gates STEP 4.8 πέρασαν **ΚΑΙ status==tradeable**) τότε **αμέσως** μετά το send του Tier C message, **διαλέγεις το σωστό `--tag`**:
 
 ### Tag selection rules (3 περιπτώσεις)
 

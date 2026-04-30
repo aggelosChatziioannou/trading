@@ -53,18 +53,36 @@ def log_error(source, error):
         pass
 
 ASSETS = {
-    "EURUSD": {"yf": "EURUSD=X",  "yahoo_id": "EURUSD=X",  "fmt": ".4f",  "range": (0.90, 1.30),    "td": "EUR/USD"},
-    "GBPUSD": {"yf": "GBPUSD=X",  "yahoo_id": "GBPUSD=X",  "fmt": ".4f",  "range": (1.15, 1.45),    "td": "GBP/USD"},
-    "USDJPY": {"yf": "JPY=X",     "yahoo_id": "JPY=X",     "fmt": ".2f",  "range": (120, 170),      "td": "USD/JPY"},
-    "AUDUSD": {"yf": "AUDUSD=X",  "yahoo_id": "AUDUSD=X",  "fmt": ".4f",  "range": (0.55, 0.80),    "td": "AUD/USD"},
-    "XAUUSD": {"yf": "GC=F",      "yahoo_id": "GC=F",      "fmt": ",.2f", "range": (1800, 8000),    "td": "XAU/USD"},
-    "NAS100": {"yf": "NQ=F",      "yahoo_id": "NQ=F",      "fmt": ",.2f", "range": (15000, 40000),  "td": None},
-    "SPX500": {"yf": "ES=F",      "yahoo_id": "ES=F",      "fmt": ",.2f", "range": (3500, 9500),    "td": None},
-    "BTC":    {"yf": "BTC-USD",   "yahoo_id": "BTC-USD",   "fmt": ",.0f", "range": (30000, 200000), "td": "BTC/USD"},
-    "ETH":    {"yf": "ETH-USD",   "yahoo_id": "ETH-USD",   "fmt": ",.2f", "range": (1000, 8000),    "td": "ETH/USD"},
-    "SOL":    {"yf": "SOL-USD",   "yahoo_id": "SOL-USD",   "fmt": ",.2f", "range": (30, 400),       "td": "SOL/USD"},
-    "XRP":    {"yf": "XRP-USD",   "yahoo_id": "XRP-USD",   "fmt": ".4f",  "range": (0.30, 5.00),    "td": "XRP/USD"},
-    "DXY":    {"yf": "DX-Y.NYB",  "yahoo_id": "DX-Y.NYB",  "fmt": ".2f",  "range": (90, 120),       "td": None},
+    # ── Forex (provider chain: twelvedata → yahoo-web → yfinance) ──
+    "EURUSD": {"yf": "EURUSD=X",  "yahoo_id": "EURUSD=X",  "fmt": ".4f",  "range": (0.90, 1.30),    "td": "EUR/USD",  "binance": None,        "asset_class": "forex"},
+    "GBPUSD": {"yf": "GBPUSD=X",  "yahoo_id": "GBPUSD=X",  "fmt": ".4f",  "range": (1.15, 1.45),    "td": "GBP/USD",  "binance": None,        "asset_class": "forex"},
+    "USDJPY": {"yf": "JPY=X",     "yahoo_id": "JPY=X",     "fmt": ".2f",  "range": (120, 170),      "td": "USD/JPY",  "binance": None,        "asset_class": "forex"},
+    "AUDUSD": {"yf": "AUDUSD=X",  "yahoo_id": "AUDUSD=X",  "fmt": ".4f",  "range": (0.55, 0.80),    "td": "AUD/USD",  "binance": None,        "asset_class": "forex"},
+    # ── Gold (twelvedata → yahoo-web futures) ──
+    "XAUUSD": {"yf": "GC=F",      "yahoo_id": "GC=F",      "fmt": ",.2f", "range": (1800, 8000),    "td": "XAU/USD",  "binance": None,        "asset_class": "metal"},
+    # ── Indices: cash tickers (^IXIC, ^GSPC) for TradingView-aligned prices ──
+    # NAS100/SPX500 are now CASH indices, not futures. Used to be NQ=F/ES=F which
+    # diverged ~30-50pts from TradingView's default cash chart.
+    "NAS100": {"yf": "^IXIC",     "yahoo_id": "^IXIC",     "fmt": ",.2f", "range": (15000, 40000),  "td": "IXIC",     "binance": None,        "asset_class": "index"},
+    "SPX500": {"yf": "^GSPC",     "yahoo_id": "^GSPC",     "fmt": ",.2f", "range": (3500, 9500),    "td": "SPX",      "binance": None,        "asset_class": "index"},
+    # ── Crypto (Binance public ticker primary — matches every major exchange) ──
+    "BTC":    {"yf": "BTC-USD",   "yahoo_id": "BTC-USD",   "fmt": ",.0f", "range": (30000, 200000), "td": "BTC/USD",  "binance": "BTCUSDT",   "asset_class": "crypto"},
+    "ETH":    {"yf": "ETH-USD",   "yahoo_id": "ETH-USD",   "fmt": ",.2f", "range": (1000, 8000),    "td": "ETH/USD",  "binance": "ETHUSDT",   "asset_class": "crypto"},
+    "SOL":    {"yf": "SOL-USD",   "yahoo_id": "SOL-USD",   "fmt": ",.2f", "range": (30, 400),       "td": "SOL/USD",  "binance": "SOLUSDT",   "asset_class": "crypto"},
+    "XRP":    {"yf": "XRP-USD",   "yahoo_id": "XRP-USD",   "fmt": ".4f",  "range": (0.30, 5.00),    "td": "XRP/USD",  "binance": "XRPUSDT",   "asset_class": "crypto"},
+    # ── Dollar Index ──
+    "DXY":    {"yf": "DX-Y.NYB",  "yahoo_id": "DX-Y.NYB",  "fmt": ".2f",  "range": (90, 120),       "td": "DXY",      "binance": None,        "asset_class": "dxy"},
+}
+
+# Provider priority chain per asset class — tried in order, first non-None wins.
+# Each provider returns (price, source_str) or (None, "<provider>-failed").
+# This is what makes prices match TradingView's default chart for each asset class.
+PROVIDER_CHAIN = {
+    "crypto": ["binance", "twelvedata", "yahoo-web", "yfinance"],
+    "forex":  ["twelvedata", "yahoo-web", "yfinance"],
+    "metal":  ["twelvedata", "yahoo-web", "yfinance"],
+    "index":  ["twelvedata", "yahoo-web", "yfinance"],
+    "dxy":    ["yahoo-web", "twelvedata", "yfinance"],
 }
 
 
@@ -112,6 +130,58 @@ def get_price_yahoo_web(symbol):
     except Exception as e:
         log_error("yahoo-web", f"{symbol}: {type(e).__name__}: {e}")
     return None, "yahoo-web-failed"
+
+
+def get_price_binance(binance_symbol):
+    """Fetch crypto spot price from Binance public ticker API.
+
+    Binance is the primary exchange most price feeds reference, including
+    TradingView's default crypto charts. No API key needed.
+
+    Args:
+      binance_symbol: e.g., 'BTCUSDT', 'ETHUSDT', 'SOLUSDT'
+
+    Returns:
+      (price_float, source_str) or (None, 'binance-failed')
+    """
+    if not binance_symbol:
+        return None, "binance-skipped"
+    try:
+        url = f"https://api.binance.com/api/v3/ticker/price?symbol={binance_symbol}"
+        req = urllib.request.Request(url)
+        req.add_header('User-Agent', 'GoldTactic/1.0')
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = json.loads(resp.read().decode())
+            price = data.get("price")
+            if price is not None:
+                return float(price), "binance"
+    except Exception as e:
+        log_error("binance", f"{binance_symbol}: {type(e).__name__}: {e}")
+    return None, "binance-failed"
+
+
+def get_price_twelvedata_single(td_symbol):
+    """Single-symbol Twelve Data fetch. Used by per-asset provider chain.
+
+    Returns (price, source) or (None, 'twelvedata-failed' / 'twelvedata-nokey').
+    """
+    if not td_symbol:
+        return None, "twelvedata-skipped"
+    td_key = os.environ.get('TWELVEDATA_API_KEY', '')
+    if not td_key:
+        return None, "twelvedata-nokey"
+    try:
+        url = f"https://api.twelvedata.com/price?symbol={td_symbol}&apikey={td_key}"
+        req = urllib.request.Request(url)
+        req.add_header('User-Agent', 'GoldTactic/1.0')
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode())
+            price = data.get("price")
+            if price is not None:
+                return float(price), "twelvedata"
+    except Exception as e:
+        log_error("twelvedata-single", f"{td_symbol}: {type(e).__name__}: {e}")
+    return None, "twelvedata-failed"
 
 
 def get_prices_twelvedata_batch():
@@ -169,56 +239,82 @@ def check_data_staleness():
 
 
 def get_live_price(asset_name, config, td_price=None):
-    """Get price using priority: Twelve Data (real-time) > yahoo-web > yfinance.
-    td_price: pre-fetched price from get_prices_twelvedata_batch() or None.
-    Uses exponential backoff on retries (1s, 2s, 4s).
+    """Multi-source price fetch with per-asset-class provider chain.
+
+    Provider priority by asset class:
+      crypto → Binance → Twelve Data → Yahoo web → yfinance
+      forex  → Twelve Data → Yahoo web → yfinance
+      metal  → Twelve Data → Yahoo web → yfinance
+      index  → Twelve Data → Yahoo web (cash ticker) → yfinance
+      dxy    → Yahoo web (^DXY data) → Twelve Data → yfinance
+
+    Each provider returns (price, source). First valid + sanity-passing price wins
+    as the "primary". All other providers' prices are also collected for cross-
+    validation (agreed=true if max-min < 1% diff).
+
+    The primary provider is intentionally chosen to match TradingView's default
+    chart for each asset class — Binance for crypto, cash indices for indices,
+    Twelve Data (institutional-grade) for forex.
     """
-    symbol = config["yf"]
+    asset_class = config.get("asset_class", "forex")
+    chain = PROVIDER_CHAIN.get(asset_class, ["yahoo-web", "yfinance"])
+    yf_sym = config["yf"]
+    td_sym = config.get("td")
+    bin_sym = config.get("binance")
     lo, hi = config["range"]
 
-    # --- Source 1: Yahoo Finance web (near real-time, no key) ---
-    price_yw, src_yw = get_price_yahoo_web(symbol)
-    if price_yw is None:
-        for backoff in [1, 2, 4]:
-            time.sleep(backoff)
-            price_yw, src_yw = get_price_yahoo_web(symbol)
-            if price_yw is not None:
+    # Collect ALL providers' prices for cross-validation, even if not in primary chain
+    sources = {}  # name → {"price": float|None, "source": str}
+
+    def _try(provider_name):
+        """Run provider, return (price_or_none, source_str). Records to sources dict."""
+        if provider_name == "binance":
+            p, s = get_price_binance(bin_sym)
+        elif provider_name == "twelvedata":
+            # Use pre-fetched batch result if available, else single-call fallback
+            if td_price is not None:
+                p, s = td_price, "twelvedata"
+            else:
+                p, s = get_price_twelvedata_single(td_sym)
+        elif provider_name == "yahoo-web":
+            p, s = get_price_yahoo_web(yf_sym)
+            if p is None:
+                # One retry with backoff for transient Yahoo failures
+                time.sleep(1)
+                p, s = get_price_yahoo_web(yf_sym)
+        elif provider_name == "yfinance":
+            p, s = get_price_yfinance(yf_sym)
+        else:
+            p, s = None, f"{provider_name}-unknown"
+
+        # Sanity check
+        if p is not None and not (lo <= p <= hi):
+            sources[provider_name] = {"price": p, "source": f"{s}-sanity-fail"}
+            return None, f"{s}-sanity-fail"
+        sources[provider_name] = {"price": p, "source": s}
+        return p, s
+
+    # Walk the chain in order — first non-None wins as the primary price
+    primary_price = None
+    primary_src = "none"
+    for provider in chain:
+        p, s = _try(provider)
+        if primary_price is None and p is not None:
+            primary_price = p
+            primary_src = s
+            # Don't break — continue gathering cross-validation prices, but only
+            # try fast providers (skip yfinance if we already have a price, since
+            # yfinance is slow and we don't need it for confidence)
+            if provider != "yfinance":
+                continue
+            else:
                 break
+        # Already have primary; only continue to gather one more source for diff
+        if primary_price is not None and provider == "yfinance":
+            break  # don't waste time on slow yfinance for cross-check
 
-    # --- Source 2: Twelve Data (real-time, API key required) ---
-    price_td = td_price
-    src_td = "twelvedata" if td_price is not None else "twelvedata-n/a"
-
-    # --- Sanity checks ---
-    if price_yw and not (lo <= price_yw <= hi):
-        price_yw = None
-        src_yw = "yahoo-web-sanity-fail"
-    if price_td and not (lo <= price_td <= hi):
-        price_td = None
-        src_td = "twelvedata-sanity-fail"
-
-    # --- Best real-time price: prefer TD if available, else yahoo-web ---
-    best_rt = price_td if price_td else price_yw
-    best_rt_src = src_td if price_td else (src_yw if price_yw else "none")
-
-    # --- Source 3: yfinance (delayed fallback, only if real-time sources failed) ---
-    price_yf, src_yf = None, "yfinance-skipped"
-    if best_rt is None:
-        price_yf, src_yf = get_price_yfinance(symbol)
-        if price_yf is None:
-            for backoff in [1, 2, 4]:
-                time.sleep(backoff)
-                price_yf, src_yf = get_price_yfinance(symbol)
-                if price_yf is not None:
-                    break
-        if price_yf and not (lo <= price_yf <= hi):
-            price_yf = None
-            src_yf = "yfinance-sanity-fail"
-
-    final_price = best_rt if best_rt else price_yf
-
-    # --- Build reference comparison (for diff_pct / agreed) ---
-    ref_prices = [p for p in [price_yw, price_td, price_yf] if p]
+    # Build cross-validation diff stats
+    ref_prices = [v["price"] for v in sources.values() if v["price"] is not None]
     if len(ref_prices) >= 2:
         diff = max(ref_prices) - min(ref_prices)
         pct_diff = (diff / min(ref_prices)) * 100
@@ -227,15 +323,26 @@ def get_live_price(asset_name, config, td_price=None):
         pct_diff = 0.0
         agreed = len(ref_prices) == 1
 
-    status = "OK" if (agreed and final_price) else ("SINGLE_SOURCE" if final_price else "FAILED")
+    status = "OK" if (agreed and primary_price) else ("SINGLE_SOURCE" if primary_price else "FAILED")
+
+    # Backward-compatible source1/source2/source3 fields for downstream consumers
+    legacy_yw = sources.get("yahoo-web", {"price": None, "source": "yahoo-web-skipped"})
+    legacy_td = sources.get("twelvedata", {"price": None, "source": "twelvedata-skipped"})
+    legacy_yf = sources.get("yfinance", {"price": None, "source": "yfinance-skipped"})
+    legacy_bin = sources.get("binance", {"price": None, "source": "binance-skipped"})
 
     return {
         "asset": asset_name,
-        "price": final_price,
-        "realtime_source": best_rt_src,
-        "source1": {"price": price_yw,  "source": src_yw},
-        "source2": {"price": price_td,  "source": src_td},
-        "source3": {"price": price_yf,  "source": src_yf},
+        "price": primary_price,
+        "realtime_source": primary_src,
+        "asset_class": asset_class,
+        "provider_chain": chain,
+        "sources": sources,  # NEW — full per-provider result dict
+        # Legacy fields kept for downstream consumers (dashboard, sanity checks)
+        "source1": legacy_yw,
+        "source2": legacy_td,
+        "source3": legacy_yf,
+        "source4": legacy_bin,
         "agreed": agreed,
         "diff_pct": round(pct_diff, 3),
         "status": status,

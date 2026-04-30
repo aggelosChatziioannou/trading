@@ -56,8 +56,10 @@ ASSETS = {
     "GBPUSD": {"yf": "GBPUSD=X", "adr_typical": 0.0100, "pip_size": 0.0001},
     "USDJPY": {"yf": "JPY=X",    "adr_typical": 0.80,    "pip_size": 0.01},
     "AUDUSD": {"yf": "AUDUSD=X", "adr_typical": 0.0060,  "pip_size": 0.0001},
-    "NAS100": {"yf": "NQ=F",     "adr_typical": 400,     "pip_size": 1.0},
-    "SPX500": {"yf": "ES=F",     "adr_typical": 80,      "pip_size": 0.25},
+    # Cash indices (^IXIC, ^GSPC) — TradingView-aligned. 2026-04-30 switched
+    # from NQ=F/ES=F futures (which had ~30pts contango drift) to cash tickers.
+    "NAS100": {"yf": "^IXIC",    "adr_typical": 400,     "pip_size": 1.0},
+    "SPX500": {"yf": "^GSPC",    "adr_typical": 80,      "pip_size": 0.25},
     "SOL":    {"yf": "SOL-USD",  "adr_typical": 6.0,     "pip_size": 0.01},
     "BTC":    {"yf": "BTC-USD",  "adr_typical": 2000,    "pip_size": 1.0},
     "ETH":    {"yf": "ETH-USD",  "adr_typical": 80,      "pip_size": 0.01},

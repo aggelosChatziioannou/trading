@@ -11,8 +11,11 @@ Usage:
   python trs_history.py --summary --alert               # Send weekly stats to Telegram
 """
 import sys, json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+
+# EET timezone — fixes UTC-vs-EET timestamp drift (2026-04-29)
+EET = timezone(timedelta(hours=3))
 
 if sys.platform == 'win32':
     try: sys.stdout.reconfigure(encoding='utf-8', errors='replace')
@@ -37,7 +40,7 @@ def log_current(cli_trs=None):
             print("[WARN] All TRS=0 — selected_assets.json has no 'trs' field. Monitor should pass TRS as CLI args: python trs_history.py XAUUSD=4 EURUSD=3 ...")
 
     entry = {
-        "ts": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "ts": datetime.now(EET).strftime("%Y-%m-%d %H:%M"),
         "assets": assets,
     }
     with open(HISTORY_FILE, "a", encoding="utf-8") as f:
@@ -60,7 +63,7 @@ def parse_cli_trs(args):
 def weekly_summary(send_alert=False):
     if not HISTORY_FILE.exists():
         print("No history yet."); return
-    cutoff = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
+    cutoff = (datetime.now(EET) - timedelta(days=7)).strftime("%Y-%m-%d")
     asset_trs = {}
     with open(HISTORY_FILE, encoding="utf-8") as f:
         for line in f:

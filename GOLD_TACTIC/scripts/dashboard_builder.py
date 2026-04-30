@@ -18,7 +18,10 @@ Output: HTML text to stdout. Pipe into:
 import json
 import sys
 import os
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+
+# EET timezone for ALL timestamps — fixes UTC-vs-EET 3h drift bug (2026-04-29)
+EET = timezone(timedelta(hours=3))
 from pathlib import Path
 
 if sys.platform == 'win32':
@@ -43,6 +46,10 @@ DATA = Path(__file__).parent.parent / "data"
 REGIME_EMOJI = {"RISK_ON": "⚡", "RISK_OFF": "🛡️", "NEUTRAL": "😐"}
 ARROW = {"up": "🔼", "down": "🔽", "flat": "➡️"}
 
+# Health thresholds (minutes) — match data_health.py
+HEALTH_MONITOR_MAX_AGE = 45   # Monitor cycle every 20-40min, allow 45 grace
+HEALTH_SELECTOR_MAX_AGE = 600  # Selector 4×/day, max 9h (08:00→15:00 = 7h, 21:00→08:00 = 11h, but EVE→AM Sat-Mon weekend = stretchy)
+
 try:
     from risk_manager import ASSET_CONFIG
 except Exception:
@@ -65,6 +72,183 @@ def _trs_color(trs):
     if trs >= 3:
         return "🟡"
     return "⚪"
+
+
+def _parse_iso_or_naive(ts_str):
+    """Best-effort parse for various timestamp formats. Return naive datetime in EET-equivalent."""
+    if not ts_str or ts_str == "?":
+        return None
+    try:
+        if 'T' in ts_str and ('+' in ts_str or ts_str.endswith('Z')):
+            from datetime import timezone, timedelta
+            if ts_str.endswith('Z'):
+                ts_str = ts_str[:-1] + '+00:00'
+            dt = datetime.fromisoformat(ts_str)
+            return dt.replace(tzinfo=None) + timedelta(hours=3) - dt.utcoffset()
+        if ' ' in ts_str:
+            return datetime.strptime(ts_str[:19], '%Y-%m-%d %H:%M:%S')
+    except Exception:
+        return None
+    return None
+
+
+def _health_line():
+    """Render system health line: Monitor cycle age + Selector cycle age + data freshness."""
+    now = datetime.now(EET).replace(tzinfo=None)  # naive EET for comparison with parsed naive ts
+    parts = []
+
+    # Monitor last cycle from news_feed.json timestamp (written every Monitor cycle)
+    news_feed = _load("news_feed.json") or {}
+    monitor_ts = _parse_iso_or_naive(news_feed.get("timestamp"))
+    if monitor_ts:
+        if monitor_ts.tzinfo is not None:
+            monitor_ts = monitor_ts.replace(tzinfo=None)
+        age_min = (now - monitor_ts).total_seconds() / 60
+        if age_min < HEALTH_MONITOR_MAX_AGE:
+            mon_icon = "💚"
+        elif age_min < HEALTH_MONITOR_MAX_AGE * 2:
+            mon_icon = "🟡"
+        else:
+            mon_icon = "🔴"
+        parts.append(f"{mon_icon} Monitor {monitor_ts.strftime('%H:%M')} ({age_min:.0f}' ago)")
+    else:
+        parts.append("🔴 Monitor: never")
+
+    # Selector last cycle from selected_assets.json timestamp
+    selected = _load("selected_assets.json") or {}
+    sel_ts = _parse_iso_or_naive(selected.get("timestamp"))
+    if sel_ts:
+        age_min = (now - sel_ts).total_seconds() / 60
+        if age_min < HEALTH_SELECTOR_MAX_AGE:
+            sel_icon = "💚"
+        elif age_min < HEALTH_SELECTOR_MAX_AGE * 1.5:
+            sel_icon = "🟡"
+        else:
+            sel_icon = "🔴"
+        # Format: HH:MM if today, else "Mon 08:00"
+        days_ago = (now.date() - sel_ts.date()).days
+        if days_ago == 0:
+            ts_str = sel_ts.strftime('%H:%M')
+        elif days_ago == 1:
+            ts_str = "yesterday " + sel_ts.strftime('%H:%M')
+        else:
+            ts_str = sel_ts.strftime('%a %H:%M')
+        parts.append(f"{sel_icon} Selector {ts_str}")
+    else:
+        parts.append("🔴 Selector: never")
+
+    # Data health from data_health.json
+    health = _load("data_health.json") or {}
+    overall = health.get("overall_status", "UNKNOWN")
+    files = health.get("files", [])
+    fresh = sum(1 for f in files if not f.get("stale"))
+    total = len(files)
+    if overall == "HEALTHY":
+        parts.append(f"💚 Data {fresh}/{total} fresh")
+    elif overall == "DEGRADED":
+        parts.append(f"🟡 Data {fresh}/{total} fresh")
+    elif overall == "CRITICAL":
+        parts.append(f"🔴 Data {fresh}/{total} STALE")
+    else:
+        parts.append("⚪ Data: ?")
+
+    return "🩺 " + " · ".join(parts)
+
+
+def _learning_stats_lines():
+    """Render Learning Stats panel from latest weekly_audit + calibration_proposals queue.
+    Returns list of lines (empty if nothing to show)."""
+    # Find latest weekly_audit_*.json
+    audit_files = sorted(DATA.glob("weekly_audit_*.json"), reverse=True)
+    if not audit_files:
+        return ["🧠 <b>Learning</b>: αναμονή πρώτου weekly audit (Κυρ 22:00)"]
+
+    try:
+        audit = json.loads(audit_files[0].read_text(encoding='utf-8'))
+    except Exception:
+        return ["🧠 <b>Learning</b>: audit file unreadable"]
+
+    h = audit.get("headline", {})
+    week_id = audit.get("week_id", "?")
+    period = audit.get("period", {})
+
+    lines = []
+    period_short = ""
+    if period.get("start") and period.get("end"):
+        try:
+            s = datetime.fromisoformat(period["start"]).strftime("%d %b")
+            e = datetime.fromisoformat(period["end"]).strftime("%d %b")
+            period_short = f"({s}-{e})"
+        except Exception:
+            pass
+    lines.append(f"🧠 <b>Learning Stats</b> · {week_id} {period_short}".strip())
+    if h.get("trades", 0) == 0:
+        lines.append(f"   Trades: 0 · αναμονή live data")
+    else:
+        lines.append(
+            f"   Trades: {h.get('trades',0)} · WR {h.get('wr_pct',0)}% · R {h.get('avg_r',0):+.2f} · P/L {h.get('total_pnl_eur',0):+.2f}€"
+        )
+        # Best/worst strategy
+        strats = audit.get("per_strategy", []) or []
+        if strats:
+            best = max(strats, key=lambda s: (s.get("wr_pct", 0), s.get("trades", 0)))
+            worst = min(strats, key=lambda s: (s.get("wr_pct", 0), -s.get("trades", 0)))
+            if best is worst:
+                lines.append(f"   📊 {best.get('strategy','?')}: {best.get('wins',0)}W/{best.get('trades',0)}T")
+            else:
+                lines.append(
+                    f"   📊 Best: {best.get('strategy','?')[:20]} ({best.get('wins',0)}W/{best.get('trades',0)}T) · Worst: {worst.get('strategy','?')[:20]} ({worst.get('wins',0)}W/{worst.get('trades',0)}T)"
+                )
+
+    # Pending proposals
+    proposals_path = DATA / "calibration_proposals.json"
+    pending = 0
+    last_applied_age = None
+    if proposals_path.exists():
+        try:
+            pdata = json.loads(proposals_path.read_text(encoding='utf-8'))
+            pending = len([p for p in pdata.get("queue", []) if p.get("status") == "pending_approval"])
+            applied = [p for p in pdata.get("history", []) if p.get("action") == "approved"]
+            if applied:
+                last_ts = max((datetime.fromisoformat(p.get("applied_at","").replace('Z','+00:00')) for p in applied if p.get("applied_at")), default=None)
+                if last_ts:
+                    days = (datetime.now(EET) - (last_ts.astimezone(EET).replace(tzinfo=None) if last_ts.tzinfo else last_ts)).days
+                    last_applied_age = f"{days}d ago"
+        except Exception:
+            pass
+
+    if pending > 0 or last_applied_age:
+        bits = []
+        if pending > 0:
+            bits.append(f"🔬 Pending: <b>{pending}</b>")
+        if last_applied_age:
+            bits.append(f"Last applied: {last_applied_age}")
+        lines.append(f"   {' · '.join(bits)}")
+
+    return lines
+
+
+def _embargo_line():
+    """Render embargo state line. Empty if file missing or CLEAR with no upcoming."""
+    embargo = _load("embargo_state.json") or {}
+    if not embargo:
+        return ""
+    state = embargo.get("overall_state", "CLEAR")
+    if state == "CLEAR":
+        nxt = embargo.get("next_high_event")
+        if nxt and nxt.get("minutes_until", 999) < 240:
+            return f"📅 Next HIGH: {nxt['title'][:40]} σε {nxt['minutes_until']:.0f}'"
+        return ""
+    if state == "PENDING":
+        be = embargo.get("blocking_event") or {}
+        return f"🛑 EMBARGO PENDING: {be.get('title','?')[:40]} σε {abs(be.get('delta_minutes',0)):.0f}'"
+    if state == "EVENT":
+        be = embargo.get("blocking_event") or {}
+        return f"⚡ HIGH EVENT NOW: {be.get('title','?')[:50]}"
+    if state == "POST":
+        be = embargo.get("blocking_event") or {}
+        return f"🚧 POST-EVENT: {be.get('title','?')[:40]} ({abs(be.get('delta_minutes',0)):.0f}' ago)"
+    return ""
 
 
 def _criteria_line(criteria, has_data=True):
@@ -125,7 +309,7 @@ def _countdown(iso_ts):
     if expires.tzinfo is not None:
         now = datetime.now(expires.tzinfo)
     else:
-        now = datetime.now()
+        now = datetime.now(EET)
     delta = expires - now
     total = int(delta.total_seconds())
     if total <= 0:
@@ -205,7 +389,7 @@ def _next_event():
     if not candidates:
         return "—"
     from email.utils import parsedate_to_datetime
-    now = datetime.now()
+    now = datetime.now(EET)
     upcoming = []
     for ev in candidates:
         t = ev.get("time") or ev.get("datetime") or ev.get("ts") or ev.get("date")
@@ -221,8 +405,11 @@ def _next_event():
                 continue
         if et is None:
             continue
-        if et.tzinfo is not None:
-            et = et.replace(tzinfo=None)
+        # Normalize to EET-aware for comparison with `now`
+        if et.tzinfo is None:
+            et = et.replace(tzinfo=EET)
+        else:
+            et = et.astimezone(EET)
         if et >= now:
             upcoming.append((et, ev))
     if not upcoming:
@@ -281,7 +468,7 @@ def build():
     regime = (sentiment.get("market_regime") or sentiment.get("regime") or "NEUTRAL").upper()
     regime_em = REGIME_EMOJI.get(regime, "😐")
 
-    now = datetime.now().strftime("%H:%M")
+    now = datetime.now(EET).strftime("%H:%M")
 
     lines = []
     lines.append(f"📌 <b>DASHBOARD</b> · {now}")
@@ -359,6 +546,22 @@ def build():
     lines.append(
         f"🌡️ F&amp;G {fg}{fg_suffix} · {regime_em} {regime}"
     )
+
+    # T1.3 — System health heartbeat (Monitor cycle, Selector cycle, data freshness)
+    health_line = _health_line()
+    if health_line:
+        lines.append(health_line)
+
+    # T1.2 — News embargo state line (only if active or upcoming HIGH)
+    emb_line = _embargo_line()
+    if emb_line:
+        lines.append(emb_line)
+
+    # Self-Improvement v1 — Learning Stats panel (Layer 3 weekly audit summary)
+    learning = _learning_stats_lines()
+    for ln in learning:
+        lines.append(ln)
+
     return "\n".join(lines)
 
 

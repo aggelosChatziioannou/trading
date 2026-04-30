@@ -575,6 +575,10 @@ def _close(trade, reason, exit_price, events):
         emoji, label = "💀", "SL HIT"
     elif reason == "max_hold":
         emoji, label = "⌛", "MAX HOLD (4h) — close at market"
+    elif reason == "advisor_exit":
+        emoji, label = "🚪", "ADVISOR EXIT — early close (contra signals)"
+    elif reason == "news_counter":
+        emoji, label = "🚨", "NEWS COUNTER — closed on adverse news"
     else:
         emoji, label = "✅", f"CLOSED ({reason})"
 

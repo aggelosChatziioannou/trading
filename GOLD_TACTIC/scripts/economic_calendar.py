@@ -165,12 +165,51 @@ def fetch_all():
         cb_items[name] = items
         print(f"  Got {len(items)} items")
 
+    # Aggregate HIGH events from BOTH forexfactory + central_banks (FIX 2026-04-29)
+    # Previously only ff_events were considered, so FOMC/ECB statements from RSS were missed.
+    today_str = datetime.now().strftime("%Y-%m-%d")
+
+    def _is_today_high(ev):
+        if str(ev.get("impact", "")).upper() != "HIGH":
+            return False
+        date_field = ev.get("date") or ev.get("datetime") or ""
+        if not date_field:
+            return False
+        # Try multiple formats: "Wed, 29 Apr 2026 18:00:00 GMT" / "2026-04-29 18:00:00" / ISO
+        from email.utils import parsedate_to_datetime
+        try:
+            dt = parsedate_to_datetime(date_field)
+            if dt:
+                return dt.strftime("%Y-%m-%d") == today_str
+        except Exception:
+            pass
+        try:
+            if 'T' in date_field:
+                s = date_field.replace('Z', '+00:00')
+                from datetime import datetime as _dt
+                return _dt.fromisoformat(s).strftime("%Y-%m-%d") == today_str
+            if ' ' in date_field:
+                from datetime import datetime as _dt
+                return _dt.strptime(date_field[:10], "%Y-%m-%d").strftime("%Y-%m-%d") == today_str
+        except Exception:
+            pass
+        return False
+
+    high_today = [e for e in ff_events if _is_today_high(e)]
+    for bank_name, items in cb_items.items():
+        for ev in items:
+            if _is_today_high(ev):
+                # Tag the source so consumers know origin
+                ev_copy = dict(ev)
+                ev_copy["_source_bank"] = bank_name
+                high_today.append(ev_copy)
+
     result = {
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "forexfactory_events": ff_events,
         "central_banks": cb_items,
-        "high_impact_today": [e for e in ff_events if e["impact"] == "HIGH"],
-        "high_impact_count": len([e for e in ff_events if e["impact"] == "HIGH"]),
+        "high_impact_today": high_today,
+        "high_impact_count": len(high_today),
     }
 
     CALENDAR_FILE.write_text(

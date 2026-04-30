@@ -17,8 +17,11 @@ import sys
 import os
 import traceback
 import urllib.request
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+
+# EET timezone — fixes UTC-vs-EET timestamp drift (2026-04-29)
+EET = timezone(timedelta(hours=3))
 
 if sys.platform == 'win32':
     try:
@@ -34,7 +37,7 @@ def log_error(source, error):
     """Log errors to file for debugging scheduled runs."""
     try:
         with open(ERROR_LOG, "a", encoding="utf-8") as f:
-            f.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {source}: {error}\n")
+            f.write(f"[{datetime.now(EET).strftime('%Y-%m-%d %H:%M:%S')}] {source}: {error}\n")
     except:
         pass
 
@@ -251,12 +254,19 @@ def scan_asset(name, config, tv_data=None):
         h4_rsi = compute_rsi(h4['Close'])
         result["rsi_4h"] = round(float(h4_rsi.iloc[-1]), 1) if len(h4_rsi) > 0 and not pd.isna(h4_rsi.iloc[-1]) else None
 
-        # ADR consumed today
-        if len(daily) >= 15:
-            recent_ranges = (daily['High'] - daily['Low']).tail(14)
-            adr = float(recent_ranges.mean())
+        # ADR consumed today (FIX 2026-04-29): exclude today's incomplete bar from baseline +
+        # floor against config typical_adr to prevent low-vol regime distortion that inflates pct
+        if len(daily) >= 16:
+            # Skip today's bar (last row), use previous 14 closed days
+            past_ranges = (daily['High'] - daily['Low']).iloc[-15:-1]
+            adr_recent = float(past_ranges.mean())
+            adr_typical = float(config.get("adr_typical", adr_recent))
+            # Floor: use the larger of recent or 70% of typical to dampen low-vol regimes
+            adr = max(adr_recent, adr_typical * 0.70)
             today_range = float(daily['High'].iloc[-1] - daily['Low'].iloc[-1])
             result["adr"] = round(adr, 4 if config["pip_size"] < 0.01 else 2)
+            result["adr_recent"] = round(adr_recent, 4 if config["pip_size"] < 0.01 else 2)
+            result["adr_typical"] = round(adr_typical, 4 if config["pip_size"] < 0.01 else 2)
             result["adr_consumed_pct"] = round((today_range / adr) * 100, 1) if adr > 0 else 0
         else:
             result["adr_consumed_pct"] = None
@@ -525,7 +535,7 @@ def main():
     correlations = compute_correlations(tv_data=tv_data)
     with open(corr_file, 'w') as f:
         json.dump({
-            "scan_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "scan_time": datetime.now(EET).strftime("%Y-%m-%d %H:%M:%S"),
             "correlations": correlations,
         }, f, indent=2)
 
@@ -534,7 +544,7 @@ def main():
     adx_values = {r["asset"]: r.get("adx") for r in results if not r.get("error") and r.get("adx") is not None}
     with open(regime_file, 'w') as f:
         json.dump({
-            "scan_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "scan_time": datetime.now(EET).strftime("%Y-%m-%d %H:%M:%S"),
             "regimes": regimes,
             "adx": adx_values,
         }, f, indent=2)
@@ -553,7 +563,7 @@ def main():
         print(f"🌡️  Fear & Greed: {fng_str} | VIX: {vix_str} | Regime: {regime}")
 
     new_scan = {
-        "scan_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "scan_time": datetime.now(EET).strftime("%Y-%m-%d %H:%M:%S"),
         "assets": results,
         "correlations": correlations,
         "sentiment": sentiment,
@@ -578,7 +588,7 @@ def main():
         print(json.dumps(new_scan, indent=2))
     else:
         print("GOLD TACTIC — Quick Scan Dashboard")
-        print(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"Time: {datetime.now(EET).strftime('%Y-%m-%d %H:%M:%S')}")
         print("=" * 90)
         print(f"{'Asset':<8} {'Price':>12} {'Daily':>6} {'4H':>6} {'1H':>6} {'RSI(D)':>7} {'RSI(4H)':>8} {'ADR%':>6} {'Regime':>10} {'Align':>15}")
         print("-" * 90)

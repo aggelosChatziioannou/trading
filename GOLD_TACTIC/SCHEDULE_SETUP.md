@@ -143,15 +143,30 @@ Cron:     0,40 10-22 * * 0,6
 Prompt:   Read GOLD_TACTIC/prompts/market_monitor.md and execute exactly. Working dir: C:\Users\aggel\Desktop\trading
 ```
 
+### Task 9 — GT Weekly Audit (Self-Improvement Layer 3)
+
+Τρέχει **μια φορά την εβδομάδα** Κυριακή 22:00 EET. Aggregates trade outcomes, runs 3 hypothesis detectors, sends weekly digest + calibration proposals.
+
+```
+Name:     GT Weekly Audit
+Cron:     0 22 * * 0
+Prompt:   Read GOLD_TACTIC/prompts/weekly_audit.md and execute exactly. Working dir: C:\Users\aggel\Desktop\trading
+```
+
+**Τι κάνει:** Aggregates `trade_journal.jsonl` + `trade_reflections.jsonl` της εβδομάδας → παράγει `weekly_audit_YYYY_WW.json/md` + ενημερώνει `strategy_scorecard.md` + queue calibration proposals (max 2/εβδομάδα) στο `calibration_proposals.json`. Στέλνει Telegram digest στις 22:30 + per-proposal silent notification.
+
+**Δες:** [docs/SELF_IMPROVEMENT.md](docs/SELF_IMPROVEMENT.md) για το πλήρες workflow.
+
 ---
 
 ## ΒΗΜΑ 2 — Verification
 
-### 2a. Λίστα tasks (πρέπει να είναι ΑΚΡΙΒΩΣ 8)
+### 2a. Λίστα tasks (πρέπει να είναι ΑΚΡΙΒΩΣ 9)
 
 Χρησιμοποίησε το `CronList` tool ή `/schedule list`. Επιβεβαίωσε:
 - 4 Asset Selector tasks (AM, PM, EVE, WE)
 - 4 Market Monitor tasks (Peak, OffPeak, Night, WE)
+- 1 Weekly Audit task (Sunday 22:00)
 
 ### 2b. Smoke test — Asset Selector
 

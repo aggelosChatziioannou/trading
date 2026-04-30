@@ -219,6 +219,28 @@ python GOLD_TACTIC/scripts/verify_scripts.py --json
 
 Αν παραβείς αυτόν τον κανόνα, ο χρήστης θα κυνηγά για ώρες ένα bug που δεν υπάρχει — όπως έγινε στις 30/04/2026.
 
+### 🎭 ΠΟΥ εμφανίζονται τα technical errors (UX rule — από 30/04/2026)
+
+**ΠΟΤΕ στο visible Telegram message** δεν εμφανίζονται:
+- ❌ Filenames: `live_prices.json`, `quick_scan.py`, `news_scout_v2.py`, κ.λπ.
+- ❌ Line numbers: `L303`, `L617`
+- ❌ Python errors: `SyntaxError`, `ImportError`, `unterminated string`, `bare def`
+- ❌ Exit codes: `exit_code=1`
+- ❌ Tech terms: `bare def`, `unterminated`, `was never closed`
+
+**ΠΑΝΤΑ μέσα σε expandable blockquote** στο τέλος του message:
+- 🔧 <b>Τεχνική ενημέρωση (για debugging)</b> — εκεί μέσα μπορούν να μπουν τα παραπάνω
+- Ο χρήστης τα βλέπει μόνο αν τα ζητήσει (επεκτείνει το blockquote)
+- Group members που δεν ξέρουν Python δεν θα δουν τα technical bits
+
+**Αντί για technical error στο visible text**, χρησιμοποιείς **plain Greek**:
+- "Δεν μπόρεσα να ενημερώσω τις τιμές αυτή τη στιγμή"
+- "Η τεχνική εικόνα είναι παλιά (πριν 80 λεπτά)"
+- "Οι ειδήσεις δεν φρεσκαρίστηκαν αυτόν τον κύκλο"
+- "Συνεχίζω με ό,τι έχω, δεν ανοίγω trade με παλιά δεδομένα"
+
+Αυτό κάνει το μήνυμα **κατανοητό από οποιονδήποτε** — όχι μόνο dev. Επίσης δίνει εμπιστοσύνη γιατί ο χρήστης βλέπει ότι "ξέρει τι κάνει" αντί για ξεροκόκκαλα error logs.
+
 ---
 
 ## STEP 2.5 — Session Awareness (Kill Zone check)
@@ -710,36 +732,59 @@ Selection cascade: **L4 > L3 > L2 > L1**. Μόνο ένα level ανά cycle (π
 
 ---
 
-### L2 — 👁️ WATCH (Delta + News) · ~530 chars · silent
+### L2 — 👁️ WATCH (Delta + News) · ~600 chars · silent
 
-**Σκοπός:** "Κάτι κουνήθηκε αλλά όχι trade-actionable". Ομαδικό κανάλι: ο χρήστης μπορεί να skim-άρει.
+**Σκοπός:** "Κάτι κουνήθηκε αλλά όχι trade-actionable". **Ομαδικό κανάλι** — κάποιοι μέλη δεν ξέρουν τεχνική ανάλυση. **Πάντα** εξήγηση σε απλά Ελληνικά + τι σημαίνει για το trading μας.
 
 ```
-👁️ <b>WATCH</b> · {HH:MM}  ·  {SESSION_TAG}
+👁️ <b>Παρακολούθηση</b> · {HH:MM}  ·  {SESSION_TAG}
 {SELECTOR_REF_LINE}
 
-🔼 BTC <b>+0.7%</b> @ <code>$76,420</code> → TRS 3→4 (πέρασε ADR)
-   ✅TF ✅RSI ✅ADR ✅News ❌Key
+🔼 <b>BTC</b> ανέβηκε <b>+0.7%</b> στο <code>$76,420</code>
+   <i>4 από 5 κριτήρια OK — λείπει 1 (το επίπεδο τιμής)</i>
 
-📰 <b>ΝΕΟ</b>
-• <a href="{url}">"BTC ETF inflows $420M"</a> <i>(CoinDesk T1)</i> → 🟢 BTC HIGH (institutional demand)
-• <a href="{url}">"Fed dovish tone"</a> <i>(Reuters T1)</i> → 🟡 XAU MED (weaker $)
+<b>💡 Τι σημαίνει για εμάς</b>
+Πλησιάζει σε σημείο εισόδου, αλλά ακόμα πάνω από τη ζώνη που ψάχνουμε ($75,500). Περιμένουμε pullback — αν φτάσει εκεί, αξιολογούμε για άνοιγμα LONG θέσης.
 
-🟢 XAU 4/5 · 🟡 EUR 3/5 · ⚪ SOL 2/5  <i>(stable)</i>
+📰 <b>Νέα που μετράνε</b>
+🕐 <i>15λ πριν · 30/04 14:30 EET</i>
+<a href="{url}">"BTC ETF inflows $420M"</a> <i>(CoinDesk T1)</i>
+→ 🟢 Ευνοϊκό για BTC (μεγάλη ζήτηση από θεσμικούς)
 
-⏰ ECB σε 2h40'  ·  🌡️ F&amp;G 72 · ⚡ RISK_ON
-🩺 💚 Healthy
+🕐 <i>1ω πριν · 30/04 13:45 EET</i>
+<a href="{url}">"Fed dovish tone"</a> <i>(Reuters T1)</i>
+→ 🟡 Μέτρια θετικό για XAU (αδυναμία δολαρίου)
 
-<blockquote expandable>📡 <b>Πηγές</b> ({ok}/{total} · {N} άρθρα · {pct_t1}% T1)
+<b>📊 Άλλα assets</b> (σταθερά)
+🟢 XAU 4/5 · 🟡 EUR 3/5 · ⚪ SOL 2/5
+
+⏰ ECB σε 2h40'  ·  🌡️ Σεντιμέντ: άπληστο (F&amp;G 72) · ⚡ RISK_ON
+🩺 Δεδομένα: όλα φρέσκα ✓
+
+<blockquote expandable>ℹ️ <b>Επεξήγηση όρων</b>
+• <b>5 κριτήρια</b> = 5 σημεία που πρέπει να ισχύουν για να ανοίξουμε trade:
+   <b>τάση</b> (πάει προς τη σωστή κατεύθυνση)
+   <b>RSI</b> (η ορμή της τιμής δεν είναι extreme — ούτε πολύ ψηλά ούτε πολύ χαμηλά)
+   <b>ADR</b> (η μετοχή δεν έχει ξοδέψει το συνηθισμένο εύρος της — χωράει κίνηση)
+   <b>Νέα</b> (δεν υπάρχει αντίθετη είδηση που να ακυρώνει το setup)
+   <b>Επίπεδο</b> (η τιμή είναι κοντά σε σημαντικό σημείο εισόδου)
+• <b>LONG</b> = ποντάρω σε άνοδο · <b>SHORT</b> = ποντάρω σε πτώση
+• <b>F&amp;G</b> = δείκτης φόβου/απληστίας αγοράς (0-100)
+• <b>RISK_ON</b> = αγορά σε mood για ρίσκο (καλό για crypto/stocks)
+
+📡 <b>Πηγές</b> ({ok}/{total} · {N} άρθρα · {pct_t1}% T1)
 ✅ ForexLive · CoinDesk · Reuters · Investing · Reddit
 ❌ Finnhub-general (timeout)</blockquote>
 ```
 
 **Κανόνες L2:**
-- Πρώτη γραμμή μετά τον header: ΤΟ ΕΝΑ asset που άλλαξε (όχι όλα)
-- Τα υπόλοιπα 3 assets: 1 γραμμή compact "stable"
-- ΝΕΟ section: 1-3 articles με tier badge
-- Sources σε expandable blockquote (mobile-friendly)
+- Header σε καθαρά Ελληνικά: <b>Παρακολούθηση</b>, όχι "WATCH"
+- Πρώτη ενημέρωση: 1 asset που άλλαξε, με **εξήγηση τι σημαίνει**
+- Πάντα <b>💡 Τι σημαίνει για εμάς</b> section: 1-2 γραμμές που εξηγούν την επίδραση στο trading μας
+- Κάθε νέο: ώρα + tier + **απλή Ελληνική εξήγηση** μετά το →
+- Άλλα assets: σύντομα στο τέλος, μόνο αν stable (αλλιώς τα βάζεις στην κορυφή)
+- **ΥΠΟΧΡΕΩΤΙΚΟ expandable glossary** στο τέλος για όρους — ώστε νέα μέλη του group να μαθαίνουν
+- ΟΧΙ τεχνικά filenames (`live_prices.json`), ΟΧΙ exit codes, ΟΧΙ technical script errors στο visible text
 
 ---
 

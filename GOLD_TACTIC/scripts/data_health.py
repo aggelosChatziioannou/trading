@@ -36,16 +36,17 @@ if sys.platform == 'win32':
 DATA_DIR = Path(__file__).parent.parent / "data"
 EET = timezone(timedelta(hours=3))
 
-# (filename, max_age_minutes, criticality, source_script)
+# (filename, max_age_minutes, criticality, source_script, plain_greek_label)
+# plain_greek_label is used in the user-facing Telegram banner (no filename leakage).
 WATCHED_FILES = [
-    ("live_prices.json",       25,   "critical", "price_checker.py"),
-    ("quick_scan.json",        30,   "critical", "quick_scan.py"),
-    ("news_feed.json",         30,   "critical", "news_scout_v2.py --light"),
-    ("session_now.json",       25,   "critical", "session_check.py"),
-    ("selected_assets.json",   540,  "critical", "Asset Selector schedule"),
-    ("economic_calendar.json", 180,  "warn",     "economic_calendar.py"),
-    ("trs_current.json",       30,   "warn",     "Monitor cycle"),
-    ("trade_state.json",       1440, "info",     "trade_manager.py tick"),
+    ("live_prices.json",       25,   "critical", "price_checker.py",          "Τιμές αγοράς"),
+    ("quick_scan.json",        30,   "critical", "quick_scan.py",             "Τεχνική εικόνα (RSI, ADR, τάσεις)"),
+    ("news_feed.json",         30,   "critical", "news_scout_v2.py --light",  "Ροή ειδήσεων"),
+    ("session_now.json",       25,   "critical", "session_check.py",          "Συνεδρία αγοράς (kill zones)"),
+    ("selected_assets.json",   540,  "critical", "Asset Selector schedule",   "Επιλογή ημέρας (top-4 assets)"),
+    ("economic_calendar.json", 180,  "warn",     "economic_calendar.py",      "Ημερολόγιο events (Fed, ECB κ.λπ.)"),
+    ("trs_current.json",       30,   "warn",     "Monitor cycle",             "Βαθμολογία ετοιμότητας trade"),
+    ("trade_state.json",       1440, "info",     "trade_manager.py tick",     "Καταγραφή ανοιχτών trades"),
 ]
 
 
@@ -102,12 +103,13 @@ def check_freshness():
     """Return list of file health records."""
     now = datetime.now(EET)
     records = []
-    for filename, max_age_min, criticality, source in WATCHED_FILES:
+    for filename, max_age_min, criticality, source, plain_label in WATCHED_FILES:
         path = DATA_DIR / filename
         ts, ts_source = _file_timestamp(path)
         if ts is None:
             records.append({
                 "file": filename,
+                "plain_label": plain_label,
                 "exists": path.exists(),
                 "age_minutes": None,
                 "max_age_minutes": max_age_min,
@@ -123,6 +125,7 @@ def check_freshness():
         is_stale = age_minutes > max_age_min
         records.append({
             "file": filename,
+            "plain_label": plain_label,
             "exists": True,
             "age_minutes": age_minutes,
             "max_age_minutes": max_age_min,
@@ -147,25 +150,53 @@ def overall_status(records):
     return "HEALTHY", critical_stale, warn_stale
 
 
+def _humanize_age(minutes):
+    """Convert age to plain Greek: '5 λεπτά', '2 ώρες', '6 ώρες & 12 λεπτά'."""
+    if minutes is None:
+        return "δεν υπάρχει"
+    m = int(round(minutes))
+    if m < 1:
+        return "λιγότερο από 1 λεπτό"
+    if m < 60:
+        return f"{m} λεπτά"
+    h = m // 60
+    rem = m % 60
+    if rem == 0:
+        return f"{h} ώρες" if h > 1 else "1 ώρα"
+    h_str = f"{h} ώρες" if h > 1 else "1 ώρα"
+    return f"{h_str} & {rem} λεπτά"
+
+
 def render_banner(records):
-    """HTML banner for Telegram if any stale. Empty string if healthy."""
+    """Plain-Greek banner for Telegram (user-facing). Empty string if healthy.
+
+    Avoids leaking technical filenames or source-script names. Instead uses
+    plain_label ("Τιμές αγοράς", "Τεχνική εικόνα") so the user understands
+    what's missing in trading terms.
+    """
     status, critical_stale, warn_stale = overall_status(records)
     if status == "HEALTHY":
         return ""
 
     lines = []
     if status == "CRITICAL":
-        lines.append("⚠️ <b>STALE DATA</b> — οι παρακάτω πηγές απέτυχαν να ενημερωθούν:")
+        lines.append("⚠️ <b>Παλιά δεδομένα</b> — δεν μπορώ να αξιολογήσω trades αυτή τη στιγμή:")
         for r in critical_stale:
-            age = f"{r['age_minutes']:.0f}'" if r['age_minutes'] is not None else "missing"
-            lines.append(f"• <code>{r['file']}</code> — {age} (limit {r['max_age_minutes']}') · τρέξε <code>{r['source_script']}</code>")
+            age = _humanize_age(r['age_minutes'])
+            limit = _humanize_age(r['max_age_minutes'])
+            lines.append(f"• <b>{r['plain_label']}</b>: τελευταία ενημέρωση πριν {age} (όριο: {limit})")
+        lines.append("")
+        lines.append("<i>💡 Τι σημαίνει: το σύστημα δεν θα ανοίξει νέα trade με παλιά δεδομένα — capital protection. Συνεχίζω να παρακολουθώ ό,τι ξέρω.</i>")
 
     if warn_stale:
         if not lines:
-            lines.append("⚠️ Παλαιά δεδομένα (warn):")
+            lines.append("⚠️ Μερικά δεδομένα είναι λίγο παλαιότερα από το συνηθισμένο:")
+        else:
+            lines.append("")
+            lines.append("Λιγότερο σημαντικά (δεν blocks trading):")
         for r in warn_stale:
-            age = f"{r['age_minutes']:.0f}'" if r['age_minutes'] is not None else "missing"
-            lines.append(f"• {r['file']} — {age} (limit {r['max_age_minutes']}')")
+            age = _humanize_age(r['age_minutes'])
+            lines.append(f"• {r['plain_label']}: πριν {age}")
 
     return "\n".join(lines)
 

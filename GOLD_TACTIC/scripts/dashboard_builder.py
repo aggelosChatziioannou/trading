@@ -481,8 +481,19 @@ def build():
     lines.append(
         f"📊 Συνολικά: <b>{total}</b> trades · {wins}W-{losses}L · Win rate <b>{win_rate}%</b>"
     )
+    # v7.4 §6.5 — Daily-trade-count widget με color indicator (target ≥1/ημέρα)
+    now_hour = datetime.now(EET).hour
+    if trades_today >= 1:
+        trade_count_icon = "🟢"
+        target_note = ""
+    elif trades_today == 0 and now_hour < 17:
+        trade_count_icon = "🟡"
+        target_note = "  <i>(target ≥1)</i>"
+    else:  # 0 trades AND time ≥17:00 EET → daily floor zone
+        trade_count_icon = "🔴"
+        target_note = "  ⚠️ <i>0 trades — floor activation</i>"
     lines.append(
-        f"📅 Σήμερα: <b>{trades_today}</b> trades · P/L <b>{daily:+.2f}€</b> / {target}€  {bar} {pct}%"
+        f"📅 Σήμερα: {trade_count_icon} <b>{trades_today}</b> trades · P/L <b>{daily:+.2f}€</b> / {target}€  {bar} {pct}%{target_note}"
     )
     if daily_stop_hit:
         lines.append(

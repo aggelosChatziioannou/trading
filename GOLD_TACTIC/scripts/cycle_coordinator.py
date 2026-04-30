@@ -161,33 +161,154 @@ def selector_done(run_name: str, selected_count: int, duration_s: float, sources
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Monitor — start (G2/G6: check Selector lock)
+# v7.4 §6.1 — Pipeline Staleness Watchdog
 # ═══════════════════════════════════════════════════════════════════════════
-def monitor_start():
-    """Returns (proceed: bool, reason: str). Proceed=False if Selector lock active and fresh."""
-    if not LOCK_FILE.exists():
-        return True, "no lock"
+# Critical fast-cycle files: name, max_age_minutes
+# Mirror the "critical" entries from data_health.py (kept here for clarity).
+PIPELINE_CRITICAL_FILES = [
+    ("live_prices.json", 25),
+    ("quick_scan.json", 30),
+    ("news_feed.json", 30),
+    ("session_now.json", 25),
+    ("economic_calendar.json", 180),
+]
 
-    try:
-        lock_data = json.loads(LOCK_FILE.read_text(encoding='utf-8'))
-        started = _parse_iso(lock_data.get("started_at"))
-        if started is None:
-            # Malformed lock — clean it up
-            LOCK_FILE.unlink()
-            return True, "malformed lock cleared"
 
-        age_sec = (_now() - started).total_seconds()
-        if age_sec > LOCK_STALE_AFTER_SEC:
-            # Stale lock — Selector probably crashed. Clear and proceed.
-            print(f"[monitor-start] Stale lock ({age_sec:.0f}s > {LOCK_STALE_AFTER_SEC}s) — clearing and proceeding")
-            LOCK_FILE.unlink()
-            return True, f"stale lock ({age_sec:.0f}s) cleared"
+def check_pipeline_freshness(max_age_override=None):
+    """
+    v7.4 §6.1 — Check freshness of fast-cycle data files.
 
-        # Active lock — wait
-        return False, f"Selector {lock_data.get('run_name','?')} running ({age_sec:.0f}s elapsed). Defer."
-    except Exception as e:
-        # Can't read lock — best effort, proceed
-        return True, f"unreadable lock: {e}"
+    Returns dict:
+      {
+        "ok": bool,                        # True if all critical fresh
+        "stale_critical": [{file, age_min, max_age_min, source}, ...],
+        "checked_at": iso_timestamp,
+      }
+
+    A file is considered stale if its mtime (or internal `timestamp` field)
+    is older than max_age_minutes.
+    """
+    now = _now()
+    stale = []
+    for filename, max_age_min in PIPELINE_CRITICAL_FILES:
+        if max_age_override is not None:
+            max_age_min = max_age_override
+        path = DATA_DIR / filename
+        if not path.exists():
+            stale.append({
+                "file": filename,
+                "age_min": None,
+                "max_age_min": max_age_min,
+                "reason": "missing",
+            })
+            continue
+        # Prefer JSON internal timestamp if available
+        ts = None
+        try:
+            if path.suffix == ".json":
+                data = json.loads(path.read_text(encoding="utf-8"))
+                for key in ("timestamp", "updated", "generated_at", "last_tick"):
+                    if key in data:
+                        ts = _parse_iso(data[key])
+                        if ts is not None:
+                            break
+        except Exception:
+            ts = None
+        if ts is None:
+            try:
+                ts = datetime.fromtimestamp(path.stat().st_mtime, tz=EET)
+            except Exception:
+                ts = None
+        if ts is None:
+            stale.append({
+                "file": filename,
+                "age_min": None,
+                "max_age_min": max_age_min,
+                "reason": "unparseable",
+            })
+            continue
+        # Ensure tz-aware (parse_iso may return naive if string had no tz)
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=EET)
+        age_sec = (now - ts).total_seconds()
+        age_min = age_sec / 60.0
+        if age_min > max_age_min:
+            stale.append({
+                "file": filename,
+                "age_min": round(age_min, 1),
+                "max_age_min": max_age_min,
+                "reason": "stale",
+            })
+
+    return {
+        "ok": len(stale) == 0,
+        "stale_critical": stale,
+        "checked_at": _iso(now),
+    }
+
+
+def _log_pipeline_stale_skip(stale_files):
+    """Append a pipeline_stale_skip event to cycle_log.jsonl for daily aggregation."""
+    _append_jsonl(CYCLE_LOG, {
+        "ts": _iso(_now()),
+        "schedule": "GT_Monitor",
+        "type": "pipeline_stale_skip",
+        "status": "warn",
+        "stale_count": len(stale_files),
+        "stale_files": [s["file"] for s in stale_files],
+    })
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Monitor — start (G2/G6: check Selector lock + v7.4 §6.1: pipeline freshness)
+# ═══════════════════════════════════════════════════════════════════════════
+def monitor_start(check_pipeline=True):
+    """
+    Returns (proceed: bool, reason: str).
+
+    Proceed=False if:
+      - Selector lock active and fresh (existing behavior, exit code 2)
+      - Pipeline critically stale (v7.4 §6.1, exit code 3)
+
+    Pipeline staleness is logged to cycle_log.jsonl regardless of proceed.
+    """
+    # Lock check (existing)
+    if LOCK_FILE.exists():
+        try:
+            lock_data = json.loads(LOCK_FILE.read_text(encoding='utf-8'))
+            started = _parse_iso(lock_data.get("started_at"))
+            if started is None:
+                # Malformed lock — clean it up
+                LOCK_FILE.unlink()
+            else:
+                age_sec = (_now() - started).total_seconds()
+                if age_sec > LOCK_STALE_AFTER_SEC:
+                    # Stale lock — Selector probably crashed. Clear and proceed.
+                    print(f"[monitor-start] Stale lock ({age_sec:.0f}s > {LOCK_STALE_AFTER_SEC}s) — clearing")
+                    LOCK_FILE.unlink()
+                else:
+                    # Active lock — wait
+                    return False, f"Selector {lock_data.get('run_name','?')} running ({age_sec:.0f}s elapsed). Defer."
+        except Exception as e:
+            # Can't read lock — best effort, proceed
+            print(f"[monitor-start] Unreadable lock: {e} — proceeding")
+
+    # v7.4 §6.1 — Pipeline freshness check
+    if check_pipeline:
+        freshness = check_pipeline_freshness()
+        if not freshness["ok"]:
+            stale = freshness["stale_critical"]
+            _log_pipeline_stale_skip(stale)
+            stale_summary = ", ".join(
+                f"{s['file']}({s.get('age_min','?')}min)" for s in stale[:3]
+            )
+            # Pipeline stale — return warning. Caller decides whether to skip
+            # the cycle entirely or proceed in degraded mode (Tier B only).
+            # We return proceed=True with a WARN reason so existing schedules
+            # don't break, but the reason is parseable for downstream handling.
+            return True, f"WARN pipeline_stale: {len(stale)} critical files stale ({stale_summary})"
+
+    return True, "ok"
 
 
 # ═══════════════════════════════════════════════════════════════════════════

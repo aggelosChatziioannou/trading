@@ -48,11 +48,16 @@ CORRELATION_MAP_FILE = DATA / "correlation_map.json"
 
 sys.path.insert(0, str(SCRIPTS))
 try:
-    from risk_manager import ASSET_CONFIG, calculate_position_size, suggest_tp_sl
+    from risk_manager import (
+        ASSET_CONFIG, calculate_position_size, suggest_tp_sl,
+        RISK_CAP_TOLERANCE, DEFAULT_RISK_CAP_TOLERANCE,
+    )
 except Exception:
     ASSET_CONFIG = {}
     calculate_position_size = None
     suggest_tp_sl = None
+    RISK_CAP_TOLERANCE = {}
+    DEFAULT_RISK_CAP_TOLERANCE = 1.10
 
 TELEGRAM_SENDER = SCRIPTS / "telegram_sender.py"
 EET = timezone(timedelta(hours=3))
@@ -310,11 +315,47 @@ def open_trade(symbol, direction, entry, sl, tp1, tp2,
     balance = float(portfolio.get("current_balance", 0) or 0)
     risk_pct = float(portfolio.get("risk_per_trade_pct", 2.0))
     max_risk_eur = round(balance * risk_pct / 100.0 / risk_divider, 2)
-    if max_risk_eur > 0 and risk_eur > max_risk_eur * 1.1:  # 10% tolerance
-        return None, (
-            f"Lot {lot} exceeds {tag} max risk: €{risk_eur} > €{max_risk_eur} "
-            f"(tag={tag}, base {risk_pct}% of €{balance}). Reduce lot or widen SL."
+
+    # v7.4 §6.3 — Per-asset tolerance (crypto needs 1.25, others 1.10 default)
+    tolerance = RISK_CAP_TOLERANCE.get(symbol, DEFAULT_RISK_CAP_TOLERANCE)
+    auto_resize_log = None
+
+    if max_risk_eur > 0 and risk_eur > max_risk_eur * tolerance:
+        # v7.4 §6.4 — Auto-resize instead of silent abort.
+        # Compute max lot that fits inside cap (no tolerance — strict cap target).
+        pip_size_calc = _pip_size(symbol)
+        pip_value_calc = _pip_value(symbol)
+        sl_pips_calc = abs(entry - sl) / pip_size_calc if pip_size_calc else 0
+        per_lot_risk = sl_pips_calc * pip_value_calc
+        if per_lot_risk <= 0:
+            return None, (
+                f"Cannot auto-resize {symbol}: invalid SL distance "
+                f"(sl_pips={sl_pips_calc}, pip_value={pip_value_calc})."
+            )
+        target_lot = max_risk_eur / per_lot_risk
+        # Round DOWN to nearest min_lot (so we never exceed cap post-rounding)
+        cfg = ASSET_CONFIG.get(symbol) or {}
+        min_lot = float(cfg.get("min_lot", 0.01))
+        # Round-down: floor(target/min_lot) * min_lot
+        import math as _math
+        resized_lot = round(_math.floor(target_lot / min_lot) * min_lot, 4)
+        if resized_lot < min_lot:
+            # Even min_lot would overshoot the cap → genuine abort, SL too tight
+            return None, (
+                f"SL too tight for {symbol}: even min_lot {min_lot} would risk "
+                f"€{round(min_lot * per_lot_risk, 2)} > cap €{max_risk_eur}. "
+                f"Widen SL or skip this setup."
+            )
+        original_lot = lot
+        original_risk = risk_eur
+        lot = resized_lot
+        risk_eur = round(lot * per_lot_risk, 2)
+        auto_resize_log = (
+            f"v7.4 auto-resize: {symbol} lot {original_lot}→{lot} "
+            f"(risk €{original_risk}→€{risk_eur}, cap €{max_risk_eur}, tol×{tolerance})"
         )
+        # Print to stderr so cycle_log captures it; not a hard error
+        print(f"[trade_manager] {auto_resize_log}", file=sys.stderr)
 
     # Planned rewards
     pip_size = _pip_size(symbol)
@@ -353,6 +394,8 @@ def open_trade(symbol, direction, entry, sl, tp1, tp2,
         "max_hold_expires": _iso(expires),
         "auto_launch": bool(auto_launch),
         "launched": False,
+        # v7.4 §6.4 — Tracks if lot was auto-reduced to fit risk cap (None if not)
+        "auto_resize_note": auto_resize_log,
     }
 
     # Update state + portfolio

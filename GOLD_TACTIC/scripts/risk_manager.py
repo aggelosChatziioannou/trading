@@ -76,12 +76,15 @@ ASSET_CONFIG = {
         "pip_size": 1.0,
         "contract_size": 1,
         "margin_per_lot": 500,
-        "max_sl_pct_4h": 0.60,
-        "typical_sl_pct_4h": 0.35,
+        # v7.4 §5.5 — tightened from 0.60 → 0.45 (IBB natural stop = IB midpoint ~0.40%)
+        "max_sl_pct_4h": 0.45,
+        "typical_sl_pct_4h": 0.30,
     },
     "SOL": {
         "pip_value_per_lot": 1.0,
-        "min_lot": 1.0,
+        # v7.4 §6.3 — relaxed from 1.0 → 0.5 to unblock SOL probe entries
+        # IC Markets demo supports 0.5 lots on SOL
+        "min_lot": 0.5,
         "pip_size": 0.01,
         "contract_size": 1,
         "margin_per_lot": 50,
@@ -94,8 +97,9 @@ ASSET_CONFIG = {
         "pip_size": 1.0,
         "contract_size": 1,
         "margin_per_lot": 3000,
-        "max_sl_pct_4h": 1.00,
-        "typical_sl_pct_4h": 0.60,
+        # v7.4 §5.5 — tightened from 1.00 → 0.80 (smaller stops = better R-multiple)
+        "max_sl_pct_4h": 0.80,
+        "typical_sl_pct_4h": 0.55,
     },
     # ---- Scanner extras (stocks etc) ----
     "XAUUSD": {
@@ -104,10 +108,24 @@ ASSET_CONFIG = {
         "pip_size": 0.10,
         "contract_size": 100,
         "margin_per_lot": 2000,
-        "max_sl_pct_4h": 0.50,
-        "typical_sl_pct_4h": 0.25,
+        # v7.4 §5.5 — tightened from 0.50 → 0.35 (IBB natural stop = IB midpoint ~0.40%)
+        "max_sl_pct_4h": 0.35,
+        "typical_sl_pct_4h": 0.22,
     },
 }
+
+# v7.4 §6.3 — Per-asset risk-cap tolerance for post-rounding overshoot
+# Default 10% (1.10) is fine for forex. Crypto needs more slack because min_lot
+# rounding on tight stops can push actual_risk up to ~25% above target.
+# Used by trade_manager.py auto-resize logic (§6.4).
+RISK_CAP_TOLERANCE = {
+    "BTC": 1.25,
+    "ETH": 1.25,
+    "SOL": 1.25,
+    "XRP": 1.25,
+    # everything else uses default
+}
+DEFAULT_RISK_CAP_TOLERANCE = 1.10
 
 
 # ============================================================

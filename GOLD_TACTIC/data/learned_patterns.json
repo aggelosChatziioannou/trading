@@ -1,0 +1,14 @@
+{
+  "version": "v7.4-fresh",
+  "reset_date": "2026-04-30",
+  "patterns": [],
+  "active_hypotheses": [],
+  "calibration_proposals_pending": [],
+  "rejected_proposals": [],
+  "notes": [
+    "Fresh start — δεν υπάρχουν patterns από προηγούμενα cycles.",
+    "Patterns προστίθενται από scripts/daily_observer.py (Phase 3, Layer B).",
+    "Hypotheses προστίθενται όταν ο agent παρατηρεί συμπεριφορά αξιόπιστη να τεσταριστεί.",
+    "Proposals που δεν έχουν conviction υψηλή πάνε σε pending για user review."
+  ]
+}

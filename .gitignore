@@ -34,6 +34,13 @@ data/processed/
 !GOLD_TACTIC/data/news_digest.json
 !GOLD_TACTIC/data/regime_state.json
 !GOLD_TACTIC/data/research_notes.md
+# v7.4 self-improvement core state files (must be committed to seed agent state)
+!GOLD_TACTIC/data/edge_weights.json
+!GOLD_TACTIC/data/learned_patterns.json
+!GOLD_TACTIC/data/agent_calibration.json
+!GOLD_TACTIC/data/daily_observations/.gitkeep
+# v7.4 archive folder for untrusted backtest data
+!GOLD_TACTIC/_archive/**
 
 # GOLD_TACTIC — exclude generated/runtime/binary files
 GOLD_TACTIC/screenshots/*.png

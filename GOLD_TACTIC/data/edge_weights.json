@@ -1,0 +1,30 @@
+{
+  "version": "v7.4-fresh",
+  "reset_date": "2026-04-30",
+  "min_trades_for_weight": 5,
+  "validation_min_trades": 10,
+  "rolling_window_days": 30,
+  "live_blend_pct": 100,
+  "weights": {
+    "BTC": 0,
+    "ETH": 0,
+    "SOL": 0,
+    "XRP": 0,
+    "EURUSD": 0,
+    "GBPUSD": 0,
+    "USDJPY": 0,
+    "AUDUSD": 0,
+    "NAS100": 0,
+    "SPX500": 0,
+    "XAUUSD": 0,
+    "DXY": 0
+  },
+  "last_recalc": null,
+  "next_recalc": "weekly_saturday_0900_eet",
+  "notes": [
+    "Fresh start 2026-04-30 — όλα τα weights ξεκινούν στο 0.",
+    "Selector ΔΕΝ εφαρμόζει edge weight bonus όσο όλα είναι 0 (bootstrap mode).",
+    "Πρώτο recalc μετά από 5+ trades per asset, στο πρώτο weekly_audit.",
+    "Validation mark (locked strategy) απαιτεί ≥10 live trades + ≥55% win rate."
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "version": "v7.4-fresh",
+  "reset_date": "2026-04-30",
+  "last_updated": null,
+  "trs_weights_overrides": {},
+  "asset_strategy_overrides": {},
+  "regime_strategy_blocks": [],
+  "selector_rules": {
+    "min_high_edge_floor_active": false,
+    "force_include_highest_edge_when_no_winners": false,
+    "fifteen_pm_second_chance_active": true,
+    "stuck_asset_penalty_after_runs": 3
+  },
+  "monitor_rules": {
+    "trs4_acceptable_kz_quarter_size": true,
+    "regime_strategy_fit_gate": true,
+    "daily_floor_17_eet_active": true,
+    "daily_floor_max_per_day": 1
+  },
+  "auto_apply_threshold": {
+    "min_confirmations": 3,
+    "max_changes_per_week": 2
+  },
+  "notes": [
+    "Fresh start — καμία override ενεργή.",
+    "Updates γίνονται από daily_observer.py (auto με ≥3 confirmations) ή weekly_audit.py.",
+    "Low-conviction proposals πάνε στο learned_patterns.json::calibration_proposals_pending για user review.",
+    "Διαβάζεται στο STEP 0 κάθε selector + monitor cycle (Phase 4)."
+  ]
+}

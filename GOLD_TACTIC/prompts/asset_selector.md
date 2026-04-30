@@ -362,67 +362,164 @@ HTML, Greek. Διαθέσιμα: `<b>`, `<i>`, `<u>`, `<code>`, `<blockquote exp
 - **Impact (events):** 🔴 HIGH · 🟡 MED · 🟢 LOW
 - **Regime:** ⚡ RISK_ON · 🛡️ RISK_OFF · 😐 NEUTRAL
 
-### Template:
+### Template (Mockup A — Card-style με ETA + criteria + news):
 ```
-🎯 <b>ASSET SELECTION</b> · {WINDOW_LABEL} {HH:MM}
+🎯 <b>Επιλογές ημέρας</b> · {WINDOW_LABEL} {HH:MM}
 ━━━━━━━━━━━━━━━━━━━━━━
 
-🥇 <b>{SYM1}</b>  {SCORE_BAR1} <b>{SCORE1}/12</b>  {BIAS_EMOJI1}
-   <i>{ONE_LINE_REASON}</i>
-   🎯 Key: <code>{LEVEL}</code> · 👁️ {WATCH_SHORT}
+Σήμερα παρακολουθούμε 4 assets — {DIVERSITY_NOTE} (ισορροπημένη επιλογή).
 
-🥈 <b>{SYM2}</b>  {SCORE_BAR2} <b>{SCORE2}/12</b>  {BIAS_EMOJI2}
-   <i>{ONE_LINE_REASON}</i>
-   🎯 Key: <code>{LEVEL}</code> · 👁️ {WATCH_SHORT}
-
-🥉 <b>{SYM3}</b>  {SCORE_BAR3} <b>{SCORE3}/12</b>  {BIAS_EMOJI3}
-   <i>{ONE_LINE_REASON}</i>
-   🎯 Key: <code>{LEVEL}</code>
-
-4️⃣ <b>{SYM4}</b>  {SCORE_BAR4} <b>{SCORE4}/12</b>  {BIAS_EMOJI4}
-   <i>{ONE_LINE_REASON}</i>
-   🎯 Key: <code>{LEVEL}</code>
+Πιο κοντά σε trade αυτή τη στιγμή: 🥇 <b>{SYM1}</b>.
 
 ━━━━━━━━━━━━━━━━━━━━━━
-⛔ <b>Εκτός top-4:</b> {EXCLUDED_LIST}
-🧭 <b>Diversification:</b> {DIVERSITY_NOTE}  e.g. "2 crypto + 2 forex"
+🥇 <b>{SYM1}</b> · {SCORE1}/12 · {BIAS_EMOJI1} {BIAS1} (πιο κοντά)
+Τιμή τώρα: <code>{PRICE1}</code>
+🎯 Σημείο εισόδου: <code>{ENTRY_ZONE1}</code>
+
+✅ <b>Τι έχουμε ήδη:</b>
+   ✓ {CRITERION_MET_1A}
+   ✓ {CRITERION_MET_1B}
+   ✓ {CRITERION_MET_1C}
+
+⏳ <b>Τι περιμένουμε:</b>
+   • {CRITERION_PENDING_1A}
+   • {CRITERION_PENDING_1B}
+
+📰 <b>Νέα που στηρίζουν:</b> {NEWS_SUPPORT1} (<i>{SOURCE1} T{TIER1}, πριν {AGE1}</i>)
+
+🔮 <b>Επόμενο βήμα:</b> {ETA1} {ETA_CONTEXT1}
+
+━━━━━━━━━━━━━━━━━━━━━━
+🥈 <b>{SYM2}</b> · {SCORE2}/12 · {BIAS_EMOJI2} {BIAS2}
+Τιμή τώρα: <code>{PRICE2}</code>
+🎯 Σημείο εισόδου: {ENTRY_ZONE2}
+
+⚠️ <b>Λείπουν {N_MISSING2} σημαντικά κριτήρια:</b>
+   • {CRITERION_PENDING_2A}
+   • {CRITERION_PENDING_2B}
+
+📰 <b>Νέα:</b> {NEWS_SUMMARY2}
+
+🔮 <b>Επόμενο βήμα:</b> {ETA2} {ETA_CONTEXT2}
+
+━━━━━━━━━━━━━━━━━━━━━━
+🥉 <b>{SYM3}</b> · {SCORE3}/12 · {BIAS_EMOJI3} {BIAS3}
+Τιμή τώρα: <code>{PRICE3}</code>
+📰 <b>Νέα:</b> {NEWS_SUMMARY3}
+🔮 <b>Επόμενο βήμα:</b> {ETA3} {ETA_CONTEXT3}
+
+━━━━━━━━━━━━━━━━━━━━━━
+4️⃣ <b>{SYM4}</b> · {SCORE4}/12 · {BIAS_EMOJI4} {BIAS4}
+Τιμή τώρα: <code>{PRICE4}</code>
+📰 <b>Νέα:</b> {NEWS_SUMMARY4}
+🔮 <b>Επόμενο βήμα:</b> {ETA4} {ETA_CONTEXT4}
+
+━━━━━━━━━━━━━━━━━━━━━━
+{BLOCKED_LINE}    e.g.: ⛔ Παρακάμφθηκαν λόγω extreme κίνησης (ADR>120%): 🛑 XAUUSD 173% · USDJPY 140%
 
 📅 <b>Σημερινά events</b>
 • <code>{HH:MM}</code> {IMPACT_EMOJI} {EVENT_NAME}
 • <code>{HH:MM}</code> {IMPACT_EMOJI} {EVENT_NAME}
 
-💲 DXY <code>{VAL}</code> ({TREND_EMOJI} {BIAS_NOTE})
-🌡️ F&amp;G <b>{FG}</b> ({LABEL}) · VIX <code>{VIX}</code> · {REGIME_EMOJI} <b>{REGIME}</b>
+🌡️ Σεντιμέντ αγοράς: <b>{FG}</b> ({FG_LABEL}) · {REGIME_EMOJI} <b>{REGIME_LABEL}</b>
+💲 DXY <code>{DXY_PRICE}</code> ({DXY_TREND_NOTE})
 
-<blockquote expandable>📊 <b>Score breakdown ανά asset</b> (B7)
+<blockquote expandable>📊 <b>Πλήρης πίνακας — όλα τα 12 assets</b>
 
-🥇 <b>{SYM1}</b> · score <code>{SCORE1}/12</code>
-   align <code>{ALIGN1}/3</code> · news <code>{NEWS1}/2</code> · ADR <code>{ADR1}/2</code> · RSI <code>{RSI1}/2</code> · strat <code>{STRAT1}/2</code> · mkt <code>{MKT1}/1</code>
-   {FULL_STRATEGY_DETAILS}
-[same for SYM2/3/4]
+{TABLE_LINE_PER_ASSET}  e.g.:
+  🥇 SOL <code>$83.28</code> 7/12 · 📉 SHORT (top-4 ✅)
+  🥈 BTC <code>$76,089</code> 5/12 · 📉 SHORT (top-4 ✅)
+  🥉 GBPUSD <code>1.349</code> 4/12 · 📈 LONG (top-4 ✅)
+  4️⃣ AUDUSD <code>0.713</code> 4/12 · 📈 LONG (top-4 ✅)
+  -- εκτός top-4 --
+  XRP <code>$1.374</code> 6/12 · διαφοροποίηση (crypto cap)
+  ETH <code>$2,257</code> 5/12 · διαφοροποίηση (crypto cap)
+  XAUUSD <code>$4,618</code> 5/12 · 🛑 BLOCKED (ADR 173%)
+  USDJPY <code>160.0</code> 3/12 · 🛑 BLOCKED (ADR 140%)
+  NAS100 <code>$24,673</code> 4/12 · 👁️ MONITORING (cash hours start 16:00)
+  SPX500 <code>$7,135</code> 4/12 · 👁️ MONITORING (cash hours start 16:00)
+  EURUSD <code>1.169</code> 3/12 · score_too_low
+  DXY <code>98.82</code> 4/12 · score_too_low
+
+📊 <b>Score breakdown ανά top-4 asset</b>
+🥇 {SYM1}: τάση {ALIGN1}/3 · νέα {NEWS1}/2 · ADR {ADR1}/2 · RSI {RSI1}/2 · στρατ {STRAT1}/2 · ώρα {MKT1}/1
+[same για 2/3/4]
 
 📰 Market context: {EXTENDED_NOTES}</blockquote>
 
-<blockquote expandable>🌐 <b>Όλα τα 12 assets</b> (B6 — full visibility)
-
-{TABLE_LINE_PER_ASSET}  e.g.:
-  🥇 BTC <code>76,089</code> score 8 · 🟢 LONG  ✅TF ✅News ✅ADR ✅RSI
-  🥈 ETH <code>2,257</code>  score 7 · 🟢 LONG  ❌TF ✅News ✅ADR ✅RSI
-  3️⃣ GBPUSD <code>1.349</code> score 6 · 🟢 LONG  ❌TF ✅News ✅ADR ❌RSI
-  4️⃣ AUDUSD <code>0.713</code> score 6 · 🟢 LONG  ❌TF ✅News ✅ADR ❌RSI
-  -- skipped -- (κάτω από top-4 ή diversification cap)
-  XRP <code>1.374</code> score 6 · diversity_skip (crypto cap)
-  SOL <code>83.28</code> score 5 · diversity_skip (crypto cap)
-  EURUSD <code>1.169</code> score 4 · score_too_low
-  XAUUSD <code>4,618</code> score 5 · 🛑 BLOCKED (ADR 173%)
-  USDJPY <code>160.0</code> score 3 · 🛑 BLOCKED (ADR 140%)
-  NAS100 <code>24,673</code> score 4 · 👁️ MONITORING (cash hours start 16:00)
-  SPX500 <code>7,135</code> score 4 · 👁️ MONITORING (cash hours start 16:00)
-  DXY <code>98.82</code> score 4 · score_too_low
-
-Status legend: ✅ tradeable · 👁️ monitoring · 🛑 blocked
-</blockquote>
+<blockquote expandable>ℹ️ <b>Επεξήγηση όρων</b>
+• <b>Σκορ /12</b> = πόσα από τα 12 σημεία ελέγχου περνάει το setup (τάση + νέα + εύρος + ορμή RSI + στρατηγική + ώρα αγοράς)
+• <b>📈 LONG</b> = ποντάρω σε άνοδο · <b>📉 SHORT</b> = ποντάρω σε πτώση
+• <b>ADR</b> = πόσος χώρος κίνησης απομένει στη μέρα (ξοδεύεται καθώς η τιμή κινείται)
+• <b>RSI</b> = ορμή τιμής (30-70 = υγιής ζώνη, εκτός = υπερβολές)
+• <b>Kill Zone</b> = ώρες υψηλής ρευστότητας (London 10:00-12:00 · NY 15:30-17:30 EET)
+• <b>F&amp;G</b> = δείκτης φόβου/απληστίας αγοράς (0-100)</blockquote>
 ```
+
+### Field-fill rules για το LLM (Mockup A specific)
+
+#### Asymmetry by rank
+- **#1** παίρνει πλήρες "Τι έχουμε / Τι περιμένουμε" detailed block (3+2 lines criteria)
+- **#2** παίρνει "Λείπουν N κριτήρια" compact (2 pending bullets)
+- **#3** και **#4** παίρνουν 3-line ultra-compact (price + news + ETA)
+
+#### `CRITERION_MET_*` — plain-Greek translation
+
+Από το score_breakdown, μετάφραση των ✓ κριτηρίων:
+
+| Internal | ✓ Plain Greek |
+|---|---|
+| TF (alignment ALIGNED/PARTIAL) | "Τάση: {BULL/BEAR} στα κεριά Daily/4ωρου/1ωρου — όλα συμφωνούν" |
+| RSI healthy (35-65) ή extreme reversal | "Ορμή RSI: {N} ({oversold/overbought/healthy})" |
+| ADR <70% consumed | "Εύρος ADR: {100-N}% — {πολύς/μέτριος} χώρος για κίνηση" |
+| News aligned με bias | "Νέα: {sentiment_label} σήμα από {source}" |
+| Key level ≤ 0.5% away | "Τιμή κοντά σε key level: {LEVEL}" |
+| Strategy applicable | "Στρατηγική: {strategy_name} ενεργοποιείται" |
+| Market hours OK | "Σε ώρα αγοράς για το asset" |
+
+#### `CRITERION_PENDING_*` — τι λείπει
+
+| Internal | ⏳ Plain Greek |
+|---|---|
+| TF MIXED | "Καθαρή κατεύθυνση τάσης (Daily/4H δεν συμφωνούν ακόμα)" |
+| RSI conflict | "RSI {N} σε δύσκολη ζώνη — αναμένεται bounce/pullback πρώτα" |
+| ADR >70% consumed | "ADR στο {N}% — μικρός χώρος, καλύτερα να περιμένουμε reset" |
+| News contra | "Νέα contra στο direction — αναμονή για αλλαγή narrative" |
+| Key far | "Τιμή {N}% μακριά από {LEVEL} — pullback retest needed" |
+| Outside KZ | "Έξω από Kill Zone — αναμονή για London/NY open" |
+
+#### `NEWS_SUPPORT_*` — top supporting article σε 1 φράση
+
+Από `news_feed.json::summary[ASSET].top_headlines` διάλεξε το άρθρο με max weighted_score στο direction του bias. Φράση + tier + age:
+- "Bitcoin & altcoins αποδυναμώνονται μετά Hormuz tension (CoinDesk T1, πριν 2ω)"
+- "BoE διατήρησε ψηλά επιτόκια — bullish για στερλίνα (ForexLive T1, πριν 45')"
+
+Αν δεν υπάρχει directional news: "ουδέτερη ροή — δεν εντοπίστηκε supporting article"
+
+#### `ETA_*` — πρόβλεψη επόμενου meaningful step
+
+Derivation rules (αν δεν υπάρχει `trs_calculator.estimate_trade_time` output):
+
+| Score | bias | Status | ETA |
+|---|---|---|---|
+| ≥7 | tradeable | οποιαδήποτε ώρα | "~30-90 λεπτά" |
+| 5-6 | tradeable | εντός KZ | "~1-2 ώρες (αναμονή candle close)" |
+| 5-6 | tradeable | εκτός KZ | "Επόμενο KZ ({HH:MM})" |
+| 3-4 | tradeable | οποιαδήποτε | "Επόμενο KZ {HH:MM} ή κίνηση τιμής" |
+| ≤2 | οποιοδήποτε | οποιαδήποτε | "Δεν αναμένεται ενημέρωση σύντομα — ADR reset 03:00 EET" |
+| οποιοδήποτε | blocked/monitoring | — | "Άνοιγμα cash hours / ADR reset / hourly status" |
+
+#### `ETA_CONTEXT_*` — 3-5 λέξεις context
+
+Παραδείγματα: `"(στο London KZ 10:00-12:00)"`, `"(αναμονή 4ωρου candle)"`, `"(στις 15:30 NY open)"`, `"(αύριο 03:00 ADR reset)"`
+
+#### `BLOCKED_LINE` — ένα-line αν υπάρχουν blocked
+
+```
+⛔ Παρακάμφθηκαν λόγω extreme κίνησης (ADR>120%): 🛑 XAUUSD 173% · USDJPY 140%
+```
+
+Αν δεν υπάρχουν blocked → omit τη γραμμή.
 
 ### Score bar (12 blocks):
 Παραγωγή: `"█" * score + "░" * (12 - score)` → π.χ. score 7 → `███████░░░░░` (solid blocks για σωστό rendering σε iOS Telegram).

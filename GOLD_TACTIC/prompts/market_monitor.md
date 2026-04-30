@@ -306,6 +306,16 @@ Read the **last 30 lines** of the briefing log for context:
 Read: GOLD_TACTIC/data/briefing_log.md  (last 30 lines only)
 ```
 
+**🔴 ΥΠΟΧΡΕΩΤΙΚΟ για το L2 WATCH continuity narrative (Mockup D):**
+
+Από τις τελευταίες 30 γραμμές του briefing_log, εντόπισε για **κάθε** από τα 4 watched assets:
+- Τιμή του στον προηγούμενο cycle (timestamp + price)
+- TRS του στον προηγούμενο cycle
+- Ποιο κριτήριο άλλαξε (αν άλλαξε)
+- Τυχόν headlines που αναφέρθηκαν
+
+Αυτά τροφοδοτούν τα `{CONTINUITY_NARRATIVE}` και `{COMPACT_OTHER_3}` placeholders του L2 template (STEP 5). Χωρίς αυτά → continuity section θα είναι generic, όχι real flow.
+
 ---
 
 ## STEP 4 — Analyze Each Asset
@@ -732,59 +742,122 @@ Selection cascade: **L4 > L3 > L2 > L1**. Μόνο ένα level ανά cycle (π
 
 ---
 
-### L2 — 👁️ WATCH (Delta + News) · ~600 chars · silent
+### L2 — 👁️ WATCH (Continuity Narrative — Mockup D) · ~750 chars · silent
 
-**Σκοπός:** "Κάτι κουνήθηκε αλλά όχι trade-actionable". **Ομαδικό κανάλι** — κάποιοι μέλη δεν ξέρουν τεχνική ανάλυση. **Πάντα** εξήγηση σε απλά Ελληνικά + τι σημαίνει για το trading μας.
+**Σκοπός:** Συνέχεια από προηγούμενο cycle (όχι τυποποιημένο). Focus στο πιο ώριμο asset, σύντομη αναφορά στα άλλα 3, plain Greek χωρίς abbreviations.
+
+**ΥΠΟΧΡΕΩΤΙΚΟ pre-step:** Διάβασε `GOLD_TACTIC/data/briefing_log.md` (last 30 lines) **πριν** γράψεις το message. Βρες τιμή focus_sym στον προηγούμενο cycle, τι κατάσταση είχε, ποια κριτήρια άλλαξαν. Αυτά τροφοδοτούν το `📖` continuity section.
 
 ```
 👁️ <b>Παρακολούθηση</b> · {HH:MM}  ·  {SESSION_TAG}
 {SELECTOR_REF_LINE}
 
-🔼 <b>BTC</b> ανέβηκε <b>+0.7%</b> στο <code>$76,420</code>
-   <i>4 από 5 κριτήρια OK — λείπει 1 (το επίπεδο τιμής)</i>
+📖 <b>Από το προηγούμενο cycle ({PREV_HH:MM})</b>
+{CONTINUITY_NARRATIVE}
 
-<b>💡 Τι σημαίνει για εμάς</b>
-Πλησιάζει σε σημείο εισόδου, αλλά ακόμα πάνω από τη ζώνη που ψάχνουμε ($75,500). Περιμένουμε pullback — αν φτάσει εκεί, αξιολογούμε για άνοιγμα LONG θέσης.
+🥇 <b>{FOCUS_SYM}</b> · {FOCUS_TRS}/5 · {BIAS_EMOJI} {BIAS} · <code>{PRICE}</code> ({DELTA_PCT_LABEL})
+   ✓ {CRIT_MET_1} · ✓ {CRIT_MET_2} · ✓ {CRIT_MET_3} · ✓ {CRIT_MET_4}
+   ⏳ {CRIT_PENDING}
+   💡 {ACTIONABLE_INSIGHT}
 
-📰 <b>Νέα που μετράνε</b>
-🕐 <i>15λ πριν · 30/04 14:30 EET</i>
-<a href="{url}">"BTC ETF inflows $420M"</a> <i>(CoinDesk T1)</i>
-→ 🟢 Ευνοϊκό για BTC (μεγάλη ζήτηση από θεσμικούς)
+📊 <b>Άλλα 3 assets</b>
+{COMPACT_OTHER_3}
 
-🕐 <i>1ω πριν · 30/04 13:45 EET</i>
-<a href="{url}">"Fed dovish tone"</a> <i>(Reuters T1)</i>
-→ 🟡 Μέτρια θετικό για XAU (αδυναμία δολαρίου)
+📰 {NEWS_SUMMARY_LINE}
 
-<b>📊 Άλλα assets</b> (σταθερά)
-🟢 XAU 4/5 · 🟡 EUR 3/5 · ⚪ SOL 2/5
+🔮 <b>Επόμενα 1-3 cycles:</b> {NEXT_CYCLE_OUTLOOK}
 
-⏰ ECB σε 2h40'  ·  🌡️ Σεντιμέντ: άπληστο (F&amp;G 72) · ⚡ RISK_ON
-🩺 Δεδομένα: όλα φρέσκα ✓
+⏰ {NEXT_KZ_OR_EVENT}  ·  🌡️ {SENTIMENT_SHORT}
+🩺 {DATA_HEALTH_LINE}
 
 <blockquote expandable>ℹ️ <b>Επεξήγηση όρων</b>
-• <b>5 κριτήρια</b> = 5 σημεία που πρέπει να ισχύουν για να ανοίξουμε trade:
-   <b>τάση</b> (πάει προς τη σωστή κατεύθυνση)
-   <b>RSI</b> (η ορμή της τιμής δεν είναι extreme — ούτε πολύ ψηλά ούτε πολύ χαμηλά)
-   <b>ADR</b> (η μετοχή δεν έχει ξοδέψει το συνηθισμένο εύρος της — χωράει κίνηση)
-   <b>Νέα</b> (δεν υπάρχει αντίθετη είδηση που να ακυρώνει το setup)
-   <b>Επίπεδο</b> (η τιμή είναι κοντά σε σημαντικό σημείο εισόδου)
-• <b>LONG</b> = ποντάρω σε άνοδο · <b>SHORT</b> = ποντάρω σε πτώση
-• <b>F&amp;G</b> = δείκτης φόβου/απληστίας αγοράς (0-100)
-• <b>RISK_ON</b> = αγορά σε mood για ρίσκο (καλό για crypto/stocks)
-
-📡 <b>Πηγές</b> ({ok}/{total} · {N} άρθρα · {pct_t1}% T1)
-✅ ForexLive · CoinDesk · Reuters · Investing · Reddit
-❌ Finnhub-general (timeout)</blockquote>
+• <b>5 κριτήρια</b> = τάση, ορμή RSI, εύρος ADR, νέα, επίπεδο τιμής
+• <b>📈 LONG</b> = ποντάρω σε άνοδο · <b>📉 SHORT</b> = ποντάρω σε πτώση
+• <b>Kill Zone</b> = ώρες υψηλής ρευστότητας (London 10-12 · NY 15:30-17:30)
+• <b>F&amp;G</b> = δείκτης φόβου/απληστίας αγοράς (0-100)</blockquote>
 ```
 
-**Κανόνες L2:**
-- Header σε καθαρά Ελληνικά: <b>Παρακολούθηση</b>, όχι "WATCH"
-- Πρώτη ενημέρωση: 1 asset που άλλαξε, με **εξήγηση τι σημαίνει**
-- Πάντα <b>💡 Τι σημαίνει για εμάς</b> section: 1-2 γραμμές που εξηγούν την επίδραση στο trading μας
-- Κάθε νέο: ώρα + tier + **απλή Ελληνική εξήγηση** μετά το →
-- Άλλα assets: σύντομα στο τέλος, μόνο αν stable (αλλιώς τα βάζεις στην κορυφή)
-- **ΥΠΟΧΡΕΩΤΙΚΟ expandable glossary** στο τέλος για όρους — ώστε νέα μέλη του group να μαθαίνουν
-- ΟΧΙ τεχνικά filenames (`live_prices.json`), ΟΧΙ exit codes, ΟΧΙ technical script errors στο visible text
+### Field-fill instructions
+
+#### `{CONTINUITY_NARRATIVE}` — 2-3 γραμμές αφήγησης (UPDATED v2)
+
+Συγκρίνεις current state με briefing_log entry του προηγούμενου cycle. Επιλέγεις pattern:
+
+| Συνθήκη | Pattern |
+|---|---|
+| Focus_sym κουνήθηκε >0.1% | "{SYM} κινήθηκε από <code>{PREV_PRICE}</code> → <code>{NOW_PRICE}</code> ({DELTA_PCT}). {SHORT_OBSERVATION}." |
+| Δεν άλλαξε σημαντικά | "Ίδια εικόνα από τις {PREV_HH:MM} — {SYM} stable στα <code>{PRICE}</code>. Καμία αλλαγή στα κριτήρια." |
+| Νέο σημαντικό άρθρο | "Νέα είδηση πριν {AGE}': {SOURCE} αναφέρει {1_LINE_SUMMARY}. {EFFECT_ON_BIAS}." |
+| TRS bucket flip (3→4 ή 4→3) | "{SYM} ανέβηκε σε {NEW_TRS}/5 (από {OLD_TRS}/5). {CRITERIA_CHANGED_DESC}." |
+
+**Παράδειγμα 1 (κίνηση):**
+> "SOL κινήθηκε από <code>$83.16</code> → <code>$83.27</code> (+0.13%). Πιο κοντά αλλά ακόμα κάτω από τη ζώνη μας ($83.00-83.20). Στις προηγούμενες 2 ώρες δοκίμασε 3 φορές το επίπεδο — δεν έσπασε. Καλό σημάδι ότι κρατά support."
+
+**Παράδειγμα 2 (αδρανές):**
+> "Ίδια εικόνα από τις 12:15 — SOL stable στα $83.20, RSI παραμένει 30. Καμία αλλαγή στα νέα. Continuity holding pattern."
+
+#### `{FOCUS_SYM}` selection rule
+1. Από τα 4 watched, focus = αυτό με το ψηλότερο TRS τώρα
+2. Tied? Focus = με μικρότερο count των ⏳ pending criteria
+3. Ακόμα tied? Focus = με fresher news supporting τη direction
+
+#### `{CRIT_MET_*}` και `{CRIT_PENDING}` — plain-Greek labels
+
+Πίνακας μετάφρασης (αντικατάσταση των τεχνικών abbreviations):
+
+| Internal label | Plain-Greek | Όταν ✓ | Όταν ⏳ (αν λείπει) |
+|---|---|---|---|
+| TF (timeframe) | "τάση" | "τάση {BULL/BEAR}" | "τάση μη καθαρή" |
+| RSI | "ορμή RSI" | "ορμή RSI {N} ({label})" | "RSI {N} — {extreme_label}" |
+| ADR | "εύρος ADR" | "εύρος ADR {N}%" | "ADR {N}% consumed (στενός χώρος)" |
+| News | "νέα" | "νέα {sentiment}" | "νέα {contra/none}" |
+| Key | "επίπεδο" | "κοντά σε επίπεδο {LEVEL}" | "{N}% μακριά από key {LEVEL}" |
+
+Παράδειγμα: αντί για `✅TF ❌RSI ✅ADR ✅News ✅Key`, γράφεις:
+```
+✓ τάση BEAR · ✓ εύρος ADR 38% · ✓ νέα bearish · ✓ κοντά σε επίπεδο
+⏳ ορμή RSI 30 — oversold, αναμένεται bounce πρώτα
+```
+
+#### `{ACTIONABLE_INSIGHT}` — 1 γραμμή τι σημαίνει αυτό για εμάς
+
+- "Ένα βήμα από trigger. Αν ανέβει στο $83.00-83.20 με weak candle → entry."
+- "Setup παρόν αλλά εκτός Kill Zone — αναμονή για London/NY."
+- "Πολύ νωρίς ακόμα — 3 κριτήρια λείπουν."
+
+#### `{COMPACT_OTHER_3}` — 1 ή 2 γραμμές
+
+Αν όλα stable:
+```
+🟡 BTC 3/5 · ⚪ GBP 2/5 · ⚪ AUD 2/5 (όλα stable)
+```
+
+Αν 1 από αυτά κουνήθηκε σημαντικά:
+```
+🟡 BTC 3/5 (κουνήθηκε +1.2% — βλ. expandable) · ⚪ GBP 2/5 · ⚪ AUD 2/5
+```
+
+#### `{NEWS_SUMMARY_LINE}`
+
+Single-line summary του τι ισχύει για τα νέα τώρα:
+- Αν εμφανίστηκε νέο άρθρο: "Νέο: {1_LINE_GREEK} ({SOURCE}, {AGE} πριν)"
+- Αν τίποτα νέο: "Δεν εμφανίστηκε νέο που να επηρεάζει ενεργά. Cached: {SHORT_VIBE}."
+
+#### `{NEXT_CYCLE_OUTLOOK}` — 1-2 γραμμές outlook
+
+- "NY KZ ανοίγει σε 2h55'. Αν SOL φτάσει $83.00-83.20 πριν τότε, εξετάζουμε probe entry."
+- "London KZ έκλεισε. Επόμενη ευκαιρία NY KZ 15:30 ή ADR reset αύριο 03:00."
+- "FOMC σε 1h30' — πιθανή downgrade σε WATCH-only μέχρι event."
+
+### Κανόνες L2 (updated)
+
+- ΥΠΟΧΡΕΩΤΙΚΟ διάβασμα `briefing_log.md` last 30 lines πριν compose → τροφοδοτεί `📖` continuity
+- Plain Greek labels (✓ τάση · ✓ ADR ...) **όχι** abbreviations (`✅TF ❌RSI`)
+- `{ACTIONABLE_INSIGHT}` ΥΠΟΧΡΕΩΤΙΚΟ — μία γραμμή «τι σημαίνει για εμάς»
+- `{NEXT_CYCLE_OUTLOOK}` ΥΠΟΧΡΕΩΤΙΚΟ — forward-looking expectation
+- ΥΠΟΧΡΕΩΤΙΚΟ glossary expandable στο τέλος (νέα members ομάδας)
+- ΟΧΙ filenames στο visible text (μόνο σε expandable αν χρειάζεται)
+- ΟΧΙ Python errors / line numbers / exit codes στο visible text
 
 ---
 

@@ -506,4 +506,8 @@ def main():
             return 1
         result = pin_message(rest[0], silent=True)
         print("OK" if result.get("ok") else result)
-        return 0 if result.get("ok") else 1
+        return 0 if result.get("ok") else 1
+
+if __name__ == "__main__":
+    import sys as _sys
+    _sys.exit(main() or 0)

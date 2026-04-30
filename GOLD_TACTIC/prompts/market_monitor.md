@@ -161,6 +161,23 @@ python GOLD_TACTIC/scripts/session_check.py
 
 🔴 **Όταν ένα script δεν τρέχει επιτυχώς, ΑΠΑΓΟΡΕΥΕΤΑΙ να κατασκευάσεις error message.** Αυτό είναι το πιο σοβαρό violation γιατί κάνει το debugging αδύνατο για τον user.
 
+### 🩺 Pre-flight integrity check (υποχρεωτικό ΠΡΙΝ αναφέρεις SyntaxError)
+
+**ΠΡΙΝ** αναφέρεις «SyntaxError», «truncated file», «( was never closed», «unterminated string», ή ΟΠΟΙΟΔΗΠΟΤΕ τεχνικό error για script, **τρέξε πρώτα**:
+
+```bash
+python GOLD_TACTIC/scripts/verify_scripts.py --json
+```
+
+Αυτό κάνει `compile()` σε όλα τα critical scripts + ελέγχει για `__main__` guards. Αν επιστρέψει `"ok": true` για ένα script, **δεν** είναι syntax-broken — οι «SyntaxErrors» που βλέπεις είναι false alarms (cached/sandbox view, partial reads, ή hallucination). Σε αυτή την περίπτωση γράφεις:
+
+```
+✅ verify_scripts.py: όλα OK — δεν υπάρχει syntax issue
+⚠️ Stale data παρά τις λειτουργικές scripts — πιθανή cause: cron schedule δεν έτρεξε ή working_directory misconfig
+```
+
+Μόνο αν `verify_scripts.py` αναφέρει συγκεκριμένο fail (π.χ. `"price_checker.py": {"ok": false, "error": "SyntaxError line 303: ..."}`) επιτρέπεται να αναφέρεις τεχνικό error — και **μόνο** με το exact stderr από το script tool.
+
 ### ❌ Forbidden patterns (παραδείγματα από real incidents)
 
 - "**SyntaxError line N**" χωρίς να έχεις πραγματική stderr απόδειξη από Python interpreter. Στις 30/04/2026 το σύστημα ανέφερε ψευδώς `quick_scan.py SyntaxError L615`, `news_scout_v2.py SyntaxError L732`, `session_check.py SyntaxError L121`, `trs_history.py SyntaxError L102` για 10 ώρες — όλα τα scripts παρσάρουν τοπικά κανονικά. Αποτέλεσμα: 10ωρο ψευδές PAUSE.

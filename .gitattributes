@@ -1,0 +1,17 @@
+# Force LF line endings for all text files — prevents Windows CRLF from
+# poisoning files when written by Cowork/cross-platform tooling.
+* text=auto eol=lf
+
+# Python explicit
+*.py text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.sh text eol=lf
+
+# Binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.pdf binary

@@ -1,24 +1,24 @@
 {
   "schema_version": "v1",
-  "last_updated": "2026-04-30T11:42:03+03:00",
-  "last_writer": "regime_detector.py force-reset",
+  "last_updated": "2026-04-30T11:47:20+03:00",
+  "last_writer": "regime_detector.py",
   "transitions_date": "2026-04-30",
   "regime": {
-    "label": "calm",
-    "since_ts": "2026-04-30T11:42:03+03:00",
+    "label": "trend_mixed",
+    "since_ts": "2026-04-30T11:47:20+03:00",
     "age_hours": 0.0,
     "conviction": "low",
-    "previous_label": null,
-    "transitions_today": 0
+    "previous_label": "calm",
+    "transitions_today": 1
   },
   "vix": {
-    "value": null,
+    "value": 18.5,
     "tier": "normal",
     "trend_4h": "flat"
   },
   "fear_greed": {
-    "value": null,
-    "label": "Neutral",
+    "value": 29,
+    "label": "Fear",
     "delta_24h": null
   },
   "sentiment_dir": "mixed",
@@ -28,11 +28,28 @@
     "key_break": null
   },
   "indicator_inputs": {
-    "adx_avg": 0.0,
-    "regimes_per_asset": {},
-    "alignment_count": {}
+    "adx_avg": 26.21,
+    "regimes_per_asset": {
+      "EURUSD": "RANGING",
+      "GBPUSD": "CHOPPY",
+      "USDJPY": "RANGING",
+      "AUDUSD": "TRENDING",
+      "NAS100": "TRENDING",
+      "SPX500": "TRENDING",
+      "SOL": "CHOPPY",
+      "BTC": "TRENDING",
+      "ETH": "RANGING",
+      "XRP": "TRENDING",
+      "XAUUSD": "RANGING",
+      "DXY": "TRENDING"
+    },
+    "alignment_count": {
+      "BULL": 0,
+      "BEAR": 0,
+      "MIXED": 11
+    }
   },
-  "session_tier": null,
+  "session_tier": "off",
   "decay_rules": {
     "reset_on_label_change": true,
     "conviction_high_after_age_h": 24

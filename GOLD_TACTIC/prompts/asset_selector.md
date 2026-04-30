@@ -117,17 +117,51 @@ Check current time (EET):
 
 ---
 
-## STEP 4 — Score Each Asset (0-10)
+## STEP 4 — Score Each Asset (0-12)
 
 For each of the 12 assets in `master_assets.json`, calculate:
 
 | Criterion | Points | How |
 |-----------|--------|-----|
 | Price alignment (Daily+4H+1H same direction) | 0-3 | All aligned=3, partial=2, mixed=1, contra=0 |
-| News support (positive/neutral for direction) | 0-2 | Supportive=2, neutral=1, contra=0 |
+| News support (**direction-aware**) | 0-2 | aligned με direction_bias=2, neutral=1, **contra=0** |
 | ADR remaining >= 30% | 0-2 | >=50%=2, 30-50%=1, <30%=0 |
+| **RSI condition (NEW)** | 0-2 | Extreme reversal candidate=2, healthy continuation=1, conflict=0 |
 | Strategy applicable now | 0-2 | Setup forming=2, possible=1, no setup=0 |
 | Market hours appropriate | 0-1 | Market open now/soon=1, closed=0 |
+
+**Total range: 0-12** (αντί 0-10 — προστέθηκε RSI criterion).
+
+### News scoring — direction-aware (B2)
+
+Πριν τη βαθμολογία news, καθόρισε προτεινόμενη `direction_bias` βάσει alignment:
+- `ALIGNED_BULL` ή `PARTIAL_BULL` → bias = **LONG**
+- `ALIGNED_BEAR` ή `PARTIAL_BEAR` → bias = **SHORT**
+- `MIXED` → bias = **NEUTRAL**
+
+Μετά scor-άρισε news σε σχέση με το bias (από `news_feed.summary[ASSET].overall_sentiment`):
+
+| News sentiment | Direction bias | Points | Σχόλιο |
+|---|---|---|---|
+| bullish | LONG | **+2** | aligned/supportive |
+| bearish | SHORT | **+2** | aligned/supportive |
+| bullish | SHORT | **0** | **contra** — καμία βοήθεια στο SHORT |
+| bearish | LONG | **0** | **contra** |
+| neutral | οποιοδήποτε | **+1** | ουδέτερο |
+| οποιοδήποτε | NEUTRAL | **+1** | δεν έχουμε direction ακόμα |
+
+### RSI scoring (B4 — NEW criterion)
+
+Από `quick_scan.json::rsi_daily` και `rsi_4h`:
+
+| Συνθήκη | Points |
+|---|---|
+| RSI Daily ≤25 ή ≥75 (strong extreme — reversal candidate) | **+2** |
+| RSI 25-30 ή 70-75 + alignment υποστηρίζει reversal direction | **+2** |
+| RSI 35-65 (healthy zone) + alignment ALIGNED ή PARTIAL (continuation) | **+1** |
+| RSI ≤30 αλλά alignment BEAR (falling knife risk) | **0** |
+| RSI ≥70 αλλά alignment BULL (late entry risk) | **0** |
+| RSI 45-55 χωρίς clear alignment | **0** |
 
 **Status flags (αντί για skip):** Κάθε asset παίρνει ένα από τρία `status`:
 
@@ -168,7 +202,7 @@ python GOLD_TACTIC/scripts/reflection_logger.py recent --symbol <SYM> --limit 3
 
 ---
 
-## STEP 5 — Select Top 4 (ΠΑΝΤΑ 4)
+## STEP 5 — Select Top 4 (ΠΑΝΤΑ 4) με Asset Class Diversification (B1)
 
 **Νέα φιλοσοφία:** Sort by score descending, **ΠΑΝΤΑ pick top 4** ανεξάρτητα από thresholds. Ακόμα κι αν όλα τα assets έχουν score=0, παίρνεις τα 4 με τον λιγότερο κακό συνδυασμό κριτηρίων. Ο user θέλει να βλέπει τι κάνει η αγορά κάθε στιγμή — κι ας μην μπει σε καμία θέση.
 
@@ -178,6 +212,58 @@ python GOLD_TACTIC/scripts/reflection_logger.py recent --symbol <SYM> --limit 3
 - `blocked` — Monitor εμφανίζει "🛑 Blocked: <reason>" στο card, καμία action
 
 Αν όλα τα top 4 βγαίνουν `monitoring_only` ή `blocked` → καθαρό σήμα "extreme market day, full pause" — αλλά συνεχίζεις να βλέπεις live data.
+
+### Asset Class Diversification Rule (B1 — NEW)
+
+**Soft cap: max 2 assets ίδιας asset_class στα top-4.**
+
+Asset classes: `crypto` (BTC/ETH/SOL/XRP), `forex` (EURUSD/GBPUSD/USDJPY/AUDUSD), `index` (NAS100/SPX500), `metal` (XAUUSD), `dxy` (DXY).
+
+Αλγόριθμος:
+
+```
+1. sorted = sort_by(score DESC, then by tiebreaker_priority)
+2. picked = []
+3. class_count = {}
+4. for asset in sorted:
+     cls = asset.asset_class
+     if class_count.get(cls, 0) >= 2:
+        continue   # skip — class already at cap
+     picked.append(asset)
+     class_count[cls] = class_count.get(cls, 0) + 1
+     if len(picked) == 4: break
+5. if len(picked) < 4:
+     # not enough diversity — backfill with skipped assets in score order
+     for asset in sorted:
+        if asset not in picked:
+           picked.append(asset)
+           if len(picked) == 4: break
+```
+
+**Παράδειγμα:**
+- Pre-diversification: BTC(6), ETH(6), XRP(6), SOL(5), GBPUSD(5), AUDUSD(5)
+- Με rule "max 2 per class":
+  - BTC ✓ (crypto: 1/2)
+  - ETH ✓ (crypto: 2/2)
+  - XRP ✗ skip (crypto cap reached)
+  - SOL ✗ skip (crypto cap reached)
+  - GBPUSD ✓ (forex: 1/2)
+  - AUDUSD ✓ (forex: 2/2)
+- Top-4: **BTC, ETH, GBPUSD, AUDUSD** (2 crypto + 2 forex — balanced)
+
+**Sort priority** (NEW v2 — status-aware):
+1. **Status priority** — tradeable προηγείται από monitoring_only, που προηγείται από blocked. Λογική: όταν υπάρχουν 8 tradeable assets, τα top-4 πρέπει να είναι όλα tradeable. Ένα blocked με score=6 δεν πρέπει να ξεπεράσει 4 tradeable με score=5 — γιατί έτσι ο user χάνει 4 actionable setups για χάρη ενός που δεν μπορούμε καν να τράδαρουμε.
+2. **Score DESC** εντός ίδιου status
+3. **Liquidity DESC** για tiebreakers (BTC > ETH > XRP > SOL για crypto · EURUSD > GBPUSD > USDJPY > AUDUSD για forex)
+4. **Data freshness** (price age σε `live_prices.json`)
+5. **Alphabetical** (last resort, ντετερμινιστικό)
+
+**News-derived bias (B2 fallback):** Αν alignment=MIXED αλλά τα news έχουν strong directional sentiment, χρησιμοποίησε το news για να ορίσεις το bias:
+- `MIXED + bullish news` → `direction_bias=LONG`, `bias_source=news` (μην αυξάνεις το score, μόνο το bias)
+- `MIXED + bearish news` → `direction_bias=SHORT`, `bias_source=news`
+- Αυτό επιτρέπει το RSI criterion να υπολογίσει σωστά (π.χ. RSI 79 + LONG = late entry, 0pts)
+
+**Document το**: στο `selected_assets.json::market_context` πρόσθεσε γραμμή `"diversification_applied: 2 crypto + 2 forex (max 2/class rule)"`. Στα `excluded_below_top4` σημείωσε γιατί κόπηκε καθένα (`"diversity_skip"` για όσα κόπηκαν λόγω rule, `"score_too_low"` για τα υπόλοιπα).
 
 Write `GOLD_TACTIC/data/selected_assets.json` (**schema v2 — v7.3 brain-aware**):
 ```json
@@ -281,24 +367,25 @@ HTML, Greek. Διαθέσιμα: `<b>`, `<i>`, `<u>`, `<code>`, `<blockquote exp
 🎯 <b>ASSET SELECTION</b> · {WINDOW_LABEL} {HH:MM}
 ━━━━━━━━━━━━━━━━━━━━━━
 
-🥇 <b>{SYM1}</b>  {SCORE_BAR1} <b>{SCORE1}/10</b>  {BIAS_EMOJI1}
+🥇 <b>{SYM1}</b>  {SCORE_BAR1} <b>{SCORE1}/12</b>  {BIAS_EMOJI1}
    <i>{ONE_LINE_REASON}</i>
    🎯 Key: <code>{LEVEL}</code> · 👁️ {WATCH_SHORT}
 
-🥈 <b>{SYM2}</b>  {SCORE_BAR2} <b>{SCORE2}/10</b>  {BIAS_EMOJI2}
+🥈 <b>{SYM2}</b>  {SCORE_BAR2} <b>{SCORE2}/12</b>  {BIAS_EMOJI2}
    <i>{ONE_LINE_REASON}</i>
    🎯 Key: <code>{LEVEL}</code> · 👁️ {WATCH_SHORT}
 
-🥉 <b>{SYM3}</b>  {SCORE_BAR3} <b>{SCORE3}/10</b>  {BIAS_EMOJI3}
+🥉 <b>{SYM3}</b>  {SCORE_BAR3} <b>{SCORE3}/12</b>  {BIAS_EMOJI3}
    <i>{ONE_LINE_REASON}</i>
    🎯 Key: <code>{LEVEL}</code>
 
-4️⃣ <b>{SYM4}</b>  {SCORE_BAR4} <b>{SCORE4}/10</b>  {BIAS_EMOJI4}
+4️⃣ <b>{SYM4}</b>  {SCORE_BAR4} <b>{SCORE4}/12</b>  {BIAS_EMOJI4}
    <i>{ONE_LINE_REASON}</i>
    🎯 Key: <code>{LEVEL}</code>
 
 ━━━━━━━━━━━━━━━━━━━━━━
-⛔ <b>Εκτός:</b> {EXCLUDED_LIST}
+⛔ <b>Εκτός top-4:</b> {EXCLUDED_LIST}
+🧭 <b>Diversification:</b> {DIVERSITY_NOTE}  e.g. "2 crypto + 2 forex"
 
 📅 <b>Σημερινά events</b>
 • <code>{HH:MM}</code> {IMPACT_EMOJI} {EVENT_NAME}
@@ -307,17 +394,38 @@ HTML, Greek. Διαθέσιμα: `<b>`, `<i>`, `<u>`, `<code>`, `<blockquote exp
 💲 DXY <code>{VAL}</code> ({TREND_EMOJI} {BIAS_NOTE})
 🌡️ F&amp;G <b>{FG}</b> ({LABEL}) · VIX <code>{VIX}</code> · {REGIME_EMOJI} <b>{REGIME}</b>
 
-<blockquote expandable>📊 <b>Αναλυτικά ανά asset</b>
-{SYM1}: {FULL_STRATEGY_DETAILS}
-{SYM2}: {FULL_STRATEGY_DETAILS}
-{SYM3}: {FULL_STRATEGY_DETAILS}
-{SYM4}: {FULL_STRATEGY_DETAILS}
+<blockquote expandable>📊 <b>Score breakdown ανά asset</b> (B7)
+
+🥇 <b>{SYM1}</b> · score <code>{SCORE1}/12</code>
+   align <code>{ALIGN1}/3</code> · news <code>{NEWS1}/2</code> · ADR <code>{ADR1}/2</code> · RSI <code>{RSI1}/2</code> · strat <code>{STRAT1}/2</code> · mkt <code>{MKT1}/1</code>
+   {FULL_STRATEGY_DETAILS}
+[same for SYM2/3/4]
 
 📰 Market context: {EXTENDED_NOTES}</blockquote>
+
+<blockquote expandable>🌐 <b>Όλα τα 12 assets</b> (B6 — full visibility)
+
+{TABLE_LINE_PER_ASSET}  e.g.:
+  🥇 BTC <code>76,089</code> score 8 · 🟢 LONG  ✅TF ✅News ✅ADR ✅RSI
+  🥈 ETH <code>2,257</code>  score 7 · 🟢 LONG  ❌TF ✅News ✅ADR ✅RSI
+  3️⃣ GBPUSD <code>1.349</code> score 6 · 🟢 LONG  ❌TF ✅News ✅ADR ❌RSI
+  4️⃣ AUDUSD <code>0.713</code> score 6 · 🟢 LONG  ❌TF ✅News ✅ADR ❌RSI
+  -- skipped -- (κάτω από top-4 ή diversification cap)
+  XRP <code>1.374</code> score 6 · diversity_skip (crypto cap)
+  SOL <code>83.28</code> score 5 · diversity_skip (crypto cap)
+  EURUSD <code>1.169</code> score 4 · score_too_low
+  XAUUSD <code>4,618</code> score 5 · 🛑 BLOCKED (ADR 173%)
+  USDJPY <code>160.0</code> score 3 · 🛑 BLOCKED (ADR 140%)
+  NAS100 <code>24,673</code> score 4 · 👁️ MONITORING (cash hours start 16:00)
+  SPX500 <code>7,135</code> score 4 · 👁️ MONITORING (cash hours start 16:00)
+  DXY <code>98.82</code> score 4 · score_too_low
+
+Status legend: ✅ tradeable · 👁️ monitoring · 🛑 blocked
+</blockquote>
 ```
 
-### Score bar (10 blocks):
-Παραγωγή: `"█" * score + "░" * (10 - score)` → π.χ. score 7 → `███████░░░` (solid blocks για σωστό rendering σε iOS Telegram).
+### Score bar (12 blocks):
+Παραγωγή: `"█" * score + "░" * (12 - score)` → π.χ. score 7 → `███████░░░░░` (solid blocks για σωστό rendering σε iOS Telegram).
 
 ### Window label:
 - 08:00 → `Πρωινή`

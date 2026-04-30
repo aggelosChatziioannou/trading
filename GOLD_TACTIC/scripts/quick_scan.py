@@ -181,6 +181,15 @@ def compute_volume_ratio(daily_df):
 
 
 def get_bias(df):
+    """Classify a timeframe's bias from EMA(9)/EMA(21) stack vs price.
+
+    Returns one of: BULL, WEAK_BULL, MIXED, WEAK_BEAR, BEAR, N/A.
+
+    Strict BULL/BEAR requires the canonical EMA stack (close > ema9 > ema21).
+    WEAK_* captures the in-between case where price agrees with one EMA but
+    not the full stack — useful for distinguishing recovering trends from
+    pure chop. Used by selector's alignment scoring (B3 — finer-grained).
+    """
     if df is None or len(df) < 21:
         return "N/A"
     close = df['Close'].iloc[-1]
@@ -188,10 +197,14 @@ def get_bias(df):
     ema21 = df['Close'].ewm(span=21).mean().iloc[-1]
     if close > ema9 > ema21:
         return "BULL"
-    elif close < ema9 < ema21:
+    if close < ema9 < ema21:
         return "BEAR"
-    else:
-        return "MIXED"
+    # B3: finer-grained leans for ranging markets
+    if close > ema21 and ema9 >= ema21:
+        return "WEAK_BULL"
+    if close < ema21 and ema9 <= ema21:
+        return "WEAK_BEAR"
+    return "MIXED"
 
 
 def load_tv_bars(tv_data, asset, timeframe):
@@ -282,17 +295,28 @@ def scan_asset(name, config, tv_data=None):
             result["sma50"] = None
             result["above_sma50"] = None
 
-        # Alignment score
+        # Alignment (B3 — looser, lean-aware):
+        #   STRONG: count of canonical BULL/BEAR (full EMA stack)
+        #   LIKE:   count of any-direction lean (BULL + WEAK_BULL or BEAR + WEAK_BEAR)
+        #   ALIGNED requires all 3 STRONG in same direction.
+        #   PARTIAL requires either 2+ STRONG OR all 3 LIKE in same direction.
         biases = [result["daily_bias"], result["h4_bias"], result["h1_bias"]]
-        bull_count = biases.count("BULL")
-        bear_count = biases.count("BEAR")
-        if bull_count == 3:
+        bull_strong = biases.count("BULL")
+        bear_strong = biases.count("BEAR")
+        bull_like = bull_strong + biases.count("WEAK_BULL")
+        bear_like = bear_strong + biases.count("WEAK_BEAR")
+        # Also expose a numeric score (-6..+6) for selectors that want continuous signal
+        weights = {"BULL": 2, "WEAK_BULL": 1, "MIXED": 0,
+                   "WEAK_BEAR": -1, "BEAR": -2, "N/A": 0}
+        result["align_score"] = sum(weights.get(b, 0) for b in biases)
+
+        if bull_strong == 3:
             result["alignment"] = "ALIGNED_BULL"
-        elif bear_count == 3:
+        elif bear_strong == 3:
             result["alignment"] = "ALIGNED_BEAR"
-        elif bull_count >= 2:
+        elif bull_strong >= 2 or bull_like == 3:
             result["alignment"] = "PARTIAL_BULL"
-        elif bear_count >= 2:
+        elif bear_strong >= 2 or bear_like == 3:
             result["alignment"] = "PARTIAL_BEAR"
         else:
             result["alignment"] = "MIXED"

@@ -1,9 +1,26 @@
 {
   "schema_version": "v2",
-  "last_updated": "2026-04-30T11:42:03+03:00",
-  "last_writer": "narrative_writer",
-  "cycles": [],
-  "last_messages": [],
+  "last_updated": "2026-04-30T11:55:02+03:00",
+  "last_writer": "monitor",
+  "cycles": [
+    {
+      "ts": "2026-04-30T11:55:02+03:00",
+      "schedule": "monitor",
+      "trs_summary": {},
+      "note": "Cycle 58: SOL TRS=3 stale, 3 scripts broken. CRITICAL data, holding pattern at 83.00-83.20."
+    }
+  ],
+  "last_messages": [
+    {
+      "ts": "2026-04-30T11:55:00+03:00",
+      "level": "L2",
+      "tier_msg_id": null,
+      "summary": "SOL 3/5 stale, CRITICAL data, 3 scripts broken, holding pattern at 83.00-83.20 resistance. No new trades.",
+      "asset_focus": [
+        "SOL"
+      ]
+    }
+  ],
   "hypotheses": [],
   "narratives_per_asset": {},
   "voice_avoid_phrases": [],

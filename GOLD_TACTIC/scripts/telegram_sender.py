@@ -39,9 +39,14 @@ if sys.platform == 'win32':
         pass
 
 from dotenv import load_dotenv
-env_path = Path(__file__).parent.parent.parent / ".env"
+_project_root = Path(__file__).parent.parent.parent
+env_path = _project_root / ".env"
 if env_path.exists():
     load_dotenv(env_path)
+# .env.local is gitignored — overrides .env for private keys
+env_local = _project_root / ".env.local"
+if env_local.exists():
+    load_dotenv(env_local, override=True)
 
 TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
 CHAT_ID = os.environ.get('TELEGRAM_CHANNEL')
@@ -501,14 +506,4 @@ def main():
             return 1
         result = pin_message(rest[0], silent=True)
         print("OK" if result.get("ok") else result)
-        return 0 if result.get("ok") else 1
-
-    if cmd == "unpin-all":
-        pass
-
-    print(f"Unknown command: {cmd}")
-    return 1
-
-
-if __name__ == "__main__":
-    sys.exit(main())
+        return 0 if result.get("ok") else 1

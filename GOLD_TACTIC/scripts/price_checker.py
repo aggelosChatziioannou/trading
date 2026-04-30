@@ -27,9 +27,15 @@ EET = timezone(timedelta(hours=3))
 
 try:
     from dotenv import load_dotenv
-    _env_path = Path(__file__).parent.parent.parent / ".env"
+    _project_root = Path(__file__).parent.parent.parent
+    # Load public .env first
+    _env_path = _project_root / ".env"
     if _env_path.exists():
         load_dotenv(_env_path)
+    # Then .env.local — gitignored, contains private keys; overrides .env values.
+    _env_local = _project_root / ".env.local"
+    if _env_local.exists():
+        load_dotenv(_env_local, override=True)
 except Exception:
     pass
 
@@ -76,14 +82,27 @@ ASSETS = {
 
 # Provider priority chain per asset class — tried in order, first non-None wins.
 # Each provider returns (price, source_str) or (None, "<provider>-failed").
-# This is what makes prices match TradingView's default chart for each asset class.
+# Designed to match TradingView's default chart per asset class while staying
+# under Twelve Data's 8-credits/minute free-tier rate limit.
+#
+# Quota math (full 12-asset sweep):
+#   - Forex (4) + Metal (1) = 5 TD credits  (under 8/min ✓)
+#   - Indices (2): Yahoo cash ^GSPC/^IXIC primary (TD as fallback if needed)
+#   - Crypto (4): Binance public API primary (no quota)
+#   - DXY (1): Yahoo
+# Total: ~5 TD + 3 Yahoo + 4 Binance per Selector run.
 PROVIDER_CHAIN = {
-    "crypto": ["binance", "twelvedata", "yahoo-web", "yfinance"],
-    "forex":  ["twelvedata", "yahoo-web", "yfinance"],
-    "metal":  ["twelvedata", "yahoo-web", "yfinance"],
-    "index":  ["twelvedata", "yahoo-web", "yfinance"],
+    "crypto": ["binance", "yahoo-web", "yfinance"],          # Binance == TradingView default
+    "forex":  ["twelvedata", "yahoo-web", "yfinance"],       # TD = institutional-grade forex
+    "metal":  ["twelvedata", "yahoo-web", "yfinance"],       # TD for XAU/USD precision
+    "index":  ["yahoo-web", "twelvedata", "yfinance"],       # Yahoo cash ticker == TradingView
     "dxy":    ["yahoo-web", "twelvedata", "yfinance"],
 }
+
+# Asset classes where Twelve Data is the PRIMARY provider — these are batched
+# in get_prices_twelvedata_batch() to consume credits efficiently (1 HTTP call,
+# N credits where N = number of TD-primary symbols).
+_TD_PRIMARY_CLASSES = {"forex", "metal"}
 
 
 def get_price_yfinance(symbol):
@@ -185,15 +204,30 @@ def get_price_twelvedata_single(td_symbol):
 
 
 def get_prices_twelvedata_batch():
-    """Batch fetch real-time prices for all supported assets from Twelve Data API.
-    Requires TWELVEDATA_API_KEY in .env. Free tier: 800 calls/day, 8/min.
-    Returns dict: {asset_name: float_price} for assets with td mapping.
+    """Batch fetch TD-primary asset prices in a single API call.
+
+    Only fetches assets where TD is the PRIMARY provider in PROVIDER_CHAIN
+    (forex + metal — currently 5 symbols: EUR/USD, GBP/USD, USD/JPY, AUD/USD,
+    XAU/USD). This stays well under the 8-credits/min free-tier limit (5 ≤ 8).
+
+    For non-TD-primary assets (indices/crypto/DXY), TD is only consulted on
+    fallback when the primary provider fails — those calls happen via
+    get_price_twelvedata_single() inside the per-asset chain.
+
+    Returns dict: {asset_name: float_price}.
     """
     td_key = os.environ.get('TWELVEDATA_API_KEY', '')
     if not td_key:
         return {}
 
-    td_symbols = {name: cfg["td"] for name, cfg in ASSETS.items() if cfg.get("td")}
+    # Limit batch to TD-primary asset classes (forex + metal) to respect rate limit
+    td_symbols = {
+        name: cfg["td"]
+        for name, cfg in ASSETS.items()
+        if cfg.get("td") and cfg.get("asset_class") in _TD_PRIMARY_CLASSES
+    }
+    if not td_symbols:
+        return {}
     symbols_str = ",".join(td_symbols.values())
     url = f"https://api.twelvedata.com/price?symbol={symbols_str}&apikey={td_key}"
 
@@ -294,24 +328,20 @@ def get_live_price(asset_name, config, td_price=None):
         sources[provider_name] = {"price": p, "source": s}
         return p, s
 
-    # Walk the chain in order — first non-None wins as the primary price
+    # Walk the chain in order — FIRST SUCCESS WINS, then stop (saves quota).
+    # Cross-validation against extra providers is intentionally skipped; the chain
+    # is already curated so that the primary provider matches TradingView's default
+    # chart for each asset class, making cross-validation redundant most of the time.
+    # If the user wants explicit multi-source diff, they can invoke individual
+    # providers directly via the helper functions.
     primary_price = None
     primary_src = "none"
     for provider in chain:
         p, s = _try(provider)
-        if primary_price is None and p is not None:
+        if p is not None:
             primary_price = p
             primary_src = s
-            # Don't break — continue gathering cross-validation prices, but only
-            # try fast providers (skip yfinance if we already have a price, since
-            # yfinance is slow and we don't need it for confidence)
-            if provider != "yfinance":
-                continue
-            else:
-                break
-        # Already have primary; only continue to gather one more source for diff
-        if primary_price is not None and provider == "yfinance":
-            break  # don't waste time on slow yfinance for cross-check
+            break  # first success wins — preserve TD quota, save round-trips
 
     # Build cross-validation diff stats
     ref_prices = [v["price"] for v in sources.values() if v["price"] is not None]

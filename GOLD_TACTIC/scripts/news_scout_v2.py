@@ -66,9 +66,14 @@ NEWS_FILE = OUTPUT_DIR / "news_feed.json"
 SELECTED_FILE = OUTPUT_DIR / "selected_assets.json"
 
 from dotenv import load_dotenv
-env_path = Path(__file__).parent.parent.parent / ".env"
+_project_root = Path(__file__).parent.parent.parent
+env_path = _project_root / ".env"
 if env_path.exists():
     load_dotenv(env_path)
+# .env.local is gitignored — overrides .env for private keys
+env_local = _project_root / ".env.local"
+if env_local.exists():
+    load_dotenv(env_local, override=True)
 
 FINNHUB_API_KEY = os.environ.get('FINNHUB_API_KEY', '')
 CRYPTOPANIC_API_KEY = os.environ.get('CRYPTOPANIC_API_KEY', '')

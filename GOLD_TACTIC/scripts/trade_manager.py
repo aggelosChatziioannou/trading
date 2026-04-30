@@ -625,10 +625,72 @@ def _close(trade, reason, exit_price, events):
     else:
         emoji, label = "✅", f"CLOSED ({reason})"
 
+    # L6 EXIT v3 (30/04/2026): plain-Greek with daily-target progress, portfolio
+    # update, and forward outlook (per IDEAL_DAY_WALKTHROUGH.md Message G).
+    daily_target = float(portfolio.get("daily_target", 30.0))
+    daily_pnl = portfolio.get("daily_pnl", 0.0)
+    daily_progress_pct = (daily_pnl / daily_target * 100) if daily_target > 0 else 0
+    target_reached = daily_pnl >= daily_target
+    progress_bar_filled = max(0, min(20, int(round(daily_progress_pct / 5))))
+    progress_bar = "█" * progress_bar_filled + "░" * (20 - progress_bar_filled)
+    daily_target_emoji = "🎉" if target_reached else "📊"
+    daily_total_trades = portfolio.get("trades_today", 0)
+    daily_wins = portfolio.get("wins_today", 0)
+    daily_losses = portfolio.get("losses_today", 0)
+
+    # Holding period
+    try:
+        opened_dt = datetime.fromisoformat(str(trade.get("opened_at", "")).replace("Z", "+00:00"))
+        hold_min = int((datetime.now(timezone.utc) - opened_dt).total_seconds() / 60)
+        hold_str = f"{hold_min // 60}ω {hold_min % 60}λ" if hold_min >= 60 else f"{hold_min}λ"
+    except Exception:
+        hold_str = "—"
+
+    # Forward outlook (only on TP wins or break-even — losses get a more sober message)
+    if reason in ("tp1", "tp2") and target_reached:
+        outlook = (
+            "\n\n🔮 <b>Τι κάνουμε τώρα</b>\n"
+            "🛑 Όχι νέο trade σήμερα — ημερήσιος στόχος επιτεύχθηκε, capital protection.\n"
+            "🎯 Παρακολούθηση μόνο για τα άλλα assets χωρίς execution.\n"
+            "🎯 Επόμενος Selector run: επανεκτίμηση για επόμενη συνεδρία."
+        )
+    elif reason in ("tp1", "tp2"):
+        outlook = (
+            "\n\n🔮 <b>Τι κάνουμε τώρα</b>\n"
+            f"🎯 Συνεχίζουμε παρακολούθηση — απομένουν {daily_target - daily_pnl:.2f}€ για ημερήσιο στόχο.\n"
+            "🎯 Νέο trade επιτρέπεται αν setup ώριμο."
+        )
+    elif reason == "sl":
+        outlook = (
+            "\n\n🔮 <b>Τι κάνουμε τώρα</b>\n"
+            "📉 Ένα κανονικό loss — μέρος του game. Μη revenge trading.\n"
+            f"🎯 Επόμενο setup θα αξιολογηθεί κανονικά (απομένουν {daily_target - daily_pnl:.2f}€ για στόχο)."
+        )
+    elif reason == "max_hold":
+        outlook = (
+            "\n\n🔮 <b>Τι κάνουμε τώρα</b>\n"
+            "⌛ Trade έληξε στο 4ωρο cap χωρίς clear move — δομικό issue, όχι entry mistake.\n"
+            "🎯 Επόμενο setup θα αξιολογηθεί με την ίδια δομή."
+        )
+    elif reason == "advisor_exit":
+        outlook = (
+            "\n\n🔮 <b>Τι κάνουμε τώρα</b>\n"
+            "🚪 Έκλεισε νωρίς γιατί contra signals εμφανίστηκαν — προστατεύσαμε κεφάλαιο.\n"
+            "🎯 Συνεχίζουμε παρακολούθηση κανονικά."
+        )
+    else:
+        outlook = ""
+
     reply = (
         f"{emoji} <b>{symbol}</b> · {label}\n"
-        f"Exit: {exit_price} · P/L <b>{_fmt_pnl(pnl)}</b>\n"
-        f"Daily P/L: {portfolio['daily_pnl']:+.2f}€ · Balance: {portfolio['current_balance']:.2f}€"
+        f"Exit: {exit_price} · P/L <b>{_fmt_pnl(pnl)}</b> · Holding: {hold_str}\n"
+        f"\n"
+        f"📊 <b>Portfolio after this trade</b>\n"
+        f"Balance: {portfolio['current_balance']:.2f}€\n"
+        f"Trades σήμερα: {daily_total_trades} ({daily_wins}W / {daily_losses}L)\n"
+        f"{daily_target_emoji} Στόχος ημέρας: {progress_bar} {daily_progress_pct:.0f}% "
+        f"({daily_pnl:+.2f}€ / {daily_target:.0f}€)"
+        f"{outlook}"
     )
     _tg_reply(reply, reply_to=trade.get("entry_msg_id"))
 

@@ -213,6 +213,37 @@ def render_line(records):
     return f"🔴 Data: {fresh}/{total} fresh — {len(critical_stale)} critical stale"
 
 
+def render_verdict(records):
+    """Plain-Greek verdict line for the bottom of every Telegram message.
+
+    Used by Monitor STEP 5 templates: skip-when-healthy rule means an empty
+    string is returned for HEALTHY status (the message has no footer at all).
+    Only DEGRADED/CRITICAL produce visible verdict text.
+    """
+    status, critical_stale, warn_stale = overall_status(records)
+    if status == "HEALTHY":
+        return ""  # signals "skip footer entirely"
+    if status == "DEGRADED":
+        # 1-2 warn-stale files but no critical ones — system still usable
+        oldest_warn = max((r["age_minutes"] or 0 for r in warn_stale), default=0)
+        oldest_label = next(
+            (r.get("plain_label", r.get("file", "?")) for r in warn_stale
+             if r.get("age_minutes") == oldest_warn),
+            "δεδομένα",
+        )
+        return (
+            f"🟡 <b>Σύστημα ενεργό</b> · {oldest_label} {int(oldest_warn)} λεπτά πριν "
+            f"(εντός ορίων, αλλά προσεκτικά)"
+        )
+    # CRITICAL — block trades
+    n = len(critical_stale)
+    src_phrase = "κρίσιμη πηγή ξεπέρασε" if n == 1 else "κρίσιμες πηγές ξεπέρασαν"
+    return (
+        f"🛑 <b>Σύστημα ΣΕ PAUSE</b> — {n} {src_phrase} το όριο. "
+        f"Δεν θα ανοίξει νέο trade με αυτά τα δεδομένα."
+    )
+
+
 def render_human(records):
     """Human-readable terminal output."""
     status, critical_stale, warn_stale = overall_status(records)
@@ -241,6 +272,12 @@ if __name__ == "__main__":
         print(json.dumps(out, indent=2, ensure_ascii=False))
     elif "--line" in sys.argv:
         print(render_line(records))
+    elif "--verdict" in sys.argv:
+        # NEW v3 (30/04/2026): plain-Greek verdict line for Telegram messages.
+        # Empty stdout when HEALTHY (skip-footer-when-healthy rule).
+        verdict = render_verdict(records)
+        if verdict:
+            print(verdict)
     elif "--banner" in sys.argv:
         banner = render_banner(records)
         if banner:

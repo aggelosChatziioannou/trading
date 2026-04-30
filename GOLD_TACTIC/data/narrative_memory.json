@@ -1,8 +1,25 @@
 {
   "schema_version": "v2",
-  "last_updated": "2026-04-30T13:15:30+03:00",
+  "last_updated": "2026-04-30T14:00:05+03:00",
   "last_writer": "Monitor",
   "cycles": [
+    {
+      "ts": "2026-04-30T13:59:53+03:00",
+      "schedule": "GT_Monitor_Peak",
+      "trs_summary": {
+        "SOL": 4,
+        "BTC": 2,
+        "GBPUSD": 3,
+        "AUDUSD": 3
+      },
+      "note": "Cycle 63: L3 SETUP SOL SHORT 4/5 (missing RSI 29.2 oversold). Scripts repaired 15/15. Probe blocked min lot. NY KZ 15:30 next window."
+    },
+    {
+      "ts": "2026-04-30T13:36:27+03:00",
+      "schedule": "Selector_AM",
+      "trs_summary": {},
+      "note": "Picked SOL,BTC,GBPUSD,AUDUSD — SOL PARTIAL_BEAR 8/12, BTC bearish news 6/12, GBPUSD+AUDUSD forex bullish 5/12. Stale data (pipeline SyntaxErrors). NY KZ 15:30 key."
+    },
     {
       "ts": "2026-04-30T13:15:13+03:00",
       "schedule": "GT_Monitor_Peak",
@@ -26,46 +43,35 @@
         "SOL": 3
       },
       "note": "Cycle 60: 4th CRITICAL, London KZ closed, dead zone to NY KZ 15:30. telegram_sender.py __main__ block restored."
-    },
-    {
-      "ts": "2026-04-30T12:16:15+03:00",
-      "schedule": "GT_Monitor_Peak",
-      "trs_summary": {
-        "SOL": 3
-      },
-      "note": "Cycle 59: London KZ closed, SOL TRS=3 stale. 4 scripts broken. ADR exhausted. CRITICAL data, no trades. Next window NY KZ 15:30."
-    },
-    {
-      "ts": "2026-04-30T11:55:02+03:00",
-      "schedule": "monitor",
-      "trs_summary": {},
-      "note": "Cycle 58: SOL TRS=3 stale, 3 scripts broken. CRITICAL data, holding pattern at 83.00-83.20."
     }
   ],
   "last_messages": [
+    {
+      "ts": "2026-04-30T13:59:53+03:00",
+      "level": "L3",
+      "tier_msg_id": "883",
+      "summary": "🎯 SETUP · SOL · 4/5 — ένα βήμα από trigger · 🎯 London Kill Zone · 🎯 Watched: AM Selector @13:34 (16' ago) — SOL·BTC·GBP·AUD · ━━━━━━━━━━━━ · 📉 SHORT bias @ $82.98  ·  TJR Trend Continuation SHORT · Αναβαθμισμένο από L2→L",
+      "asset_focus": [
+        "SOL"
+      ]
+    },
+    {
+      "ts": "2026-04-30T13:36:47+03:00",
+      "level": "L0",
+      "tier_msg_id": null,
+      "summary": "Selection card · top4: SOL,BTC,GBPUSD,AUDUSD · regime trend_mixed",
+      "asset_focus": [
+        "SOL",
+        "BTC",
+        "GBPUSD",
+        "AUDUSD"
+      ]
+    },
     {
       "ts": "2026-04-30T13:15:17+03:00",
       "level": "L2",
       "tier_msg_id": "878",
       "summary": "👁️ WATCH · 13:10  ·  🎯 London KZ — τελευταία λεπτά · 🎯 Watched: AM Selector @08:07 (5h03' ago) — SOL · ⚠️ STALE DATA — οι παρακάτω πηγές απέτυχαν να ενημερωθούν: · • live_prices.json — 140' (limit 25') · τρέξε price_chec",
-      "asset_focus": [
-        "SOL"
-      ]
-    },
-    {
-      "ts": "2026-04-30T12:53:20+03:00",
-      "level": "L2",
-      "tier_msg_id": "877",
-      "summary": "👁️ WATCH · 12:52  ·  🌙 Εκτός kill zones · 🎯 Watched: AM Selector @08:07 (4h45' ago) — SOL · ⚠️ STALE DATA — οι παρακάτω πηγές απέτυχαν να ενημερωθούν: · • live_prices.json — 120' (limit 25') · τρέξε price_checker.py · • ",
-      "asset_focus": [
-        "SOL"
-      ]
-    },
-    {
-      "ts": "2026-04-30T12:36:24+03:00",
-      "level": "L2",
-      "tier_msg_id": "876",
-      "summary": "Cycle 60: 4ος CRITICAL cycle. SOL TRS=3 stale $83.27 cached 104min. London KZ closed, dead zone until NY KZ 15:30. Scripts broken: price_checker/quick_scan/news_scout/trs_history SyntaxErrors. telegram_sender __main__ r…",
       "asset_focus": [
         "SOL"
       ]
@@ -79,26 +85,37 @@
       "then": "TRS jumps to 5/5, PROBE SHORT entry triggers at NY KZ",
       "added_ts": "2026-04-30T13:15:27+03:00",
       "expires_ts": "2026-04-30T17:15:27+03:00"
+    },
+    {
+      "id": "h1777546799",
+      "asset": "SOL",
+      "condition": "SOL break below 83.00 with BOS confirmation before or during NY KZ 15:30",
+      "then": "TRS jumps to 5/5, SHORT entry triggers (manual or auto if lot sizing resolved)",
+      "added_ts": "2026-04-30T13:59:59+03:00",
+      "expires_ts": "2026-04-30T17:59:59+03:00"
     }
   ],
   "narratives_per_asset": {
-    "SOL": "TRS corrected 3→4 (was miscounted). Session London KZ optimal tail-end. CRITICAL data blocks Probe. 4/5: TF+ADR+News+Key ✅, RSI ~30 oversold ❌."
+    "SOL": "versold ❌. SOL σε PARTIAL_BEAR trend, 3ο 24ωρο. Resistance zone 83.00-83.20 κρίσιμη: break-below targets PDL 81.63. Ενεργοποίηση στο NY KZ 15:30 EET. L3 SETUP sent (cycle 63). Scripts repaired, data φρέσκα. TRS 4/5: RSI daily 29.2 oversold blocks probe. Probe blocked min lot. NY KZ 15:30 activation.",
+    "BTC": "BTC σε MIXED alignment με hawkish Fed + oil spike 126 να πιέζουν. PDH 77885 resistance — rejection εκεί ανοίγει SHORT προς PDL 74958.",
+    "GBPUSD": "GBPUSD πάνω από SMA50 με BoE σε focus. Bullish news bias αλλά hawkish Fed headwind. Sweep PDL 1.34735 → BUY αν BOS επιβεβαιωθεί.",
+    "AUDUSD": "AUDUSD σε TRENDING (ADX 28.4), daily WEAK_BULL. Recovery από 0.7100 low. Entry κοντά PDL 0.71213 με BOS επιβεβαίωση."
   },
   "voice_avoid_phrases": [
-    "ago sol stale data",
-    "παρακάτω πηγές απέτυχαν να ενημερωθούν",
-    "οι παρακάτω πηγές απέτυχαν να ενημερωθούν",
     "πηγές απέτυχαν να ενημερωθούν live_prices json",
-    "πηγές απέτυχαν να ενημερωθούν",
+    "οι παρακάτω πηγές απέτυχαν να ενημερωθούν",
+    "ago sol stale data",
     "να ενημερωθούν live_prices json",
     "watched am selector 08",
-    "am selector 08 07",
+    "παρακάτω πηγές απέτυχαν να ενημερωθούν",
+    "πηγές απέτυχαν να ενημερωθούν",
     "stale data οι παρακάτω",
-    "παρακάτω πηγές απέτυχαν να"
+    "παρακάτω πηγές απέτυχαν να",
+    "am selector 08 07"
   ],
   "limits": {
     "cycles_max": 5,
-    "messages_max": 3,
+    "messages_max": 8,
     "hypotheses_max": 6,
     "phrases_max": 10,
     "narrative_max_chars": 300,

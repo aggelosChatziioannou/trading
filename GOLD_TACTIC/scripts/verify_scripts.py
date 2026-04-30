@@ -41,6 +41,9 @@ CRITICAL_EXECUTABLES = [
     "reflection_logger.py",
     "weekly_audit.py",
     "economic_calendar.py",
+    "delta_calculator.py",
+    "narrative_writer.py",
+    "regime_detector.py",
 ]
 
 # Library modules — only need to parse, no __main__ required

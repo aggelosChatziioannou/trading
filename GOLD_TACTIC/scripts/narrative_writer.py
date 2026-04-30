@@ -64,7 +64,11 @@ LOCK_RETRY_DELAY_SEC = 0.2
 
 DEFAULT_LIMITS = {
     "cycles_max": 5,
-    "messages_max": 3,
+    # B1 (30/04/2026) — bumped from 3 to 8 messages. At 20-min Monitor cadence,
+    # 3 entries covered ~1h of history; 8 entries cover ~2.5-3h, aligning with
+    # a typical trading session window. Lets the LLM "remember" significantly
+    # more context when composing the 📖 continuity narrative.
+    "messages_max": 8,
     "hypotheses_max": 6,
     "phrases_max": 10,
     "narrative_max_chars": 300,

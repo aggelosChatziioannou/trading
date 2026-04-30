@@ -123,9 +123,12 @@ python GOLD_TACTIC/scripts/news_scout_v2.py --light
 python GOLD_TACTIC/scripts/ghost_trades.py --check
 python GOLD_TACTIC/scripts/quick_scan.py --json XAUUSD EURUSD BTC SOL
 python GOLD_TACTIC/scripts/session_check.py
+python GOLD_TACTIC/scripts/delta_calculator.py snapshot
 ```
 
 > Note: `session_check.py` γράφει αυτόνομα στο `data/session_now.json` (δεν χρειάζεται shell redirect). `trs_history.py` runs AFTER STEP 4 (see STEP 6.5).
+>
+> **B2 (30/04/2026):** `delta_calculator.py snapshot` καταγράφει live_prices + trs_current σε `data/delta_state.jsonl` και υπολογίζει delta έναντι του προηγούμενου cycle, γράφοντας στο `data/delta_since_last_cycle.json`. Διαβάζεις αυτό το JSON στο STEP 5 για να γράψεις το `📖 Από το προηγούμενο cycle` section του L2 WATCH (Mockup D) με ντετερμινιστικά deltas — όχι free-form parsing του briefing_log.
 
 ### 🔁 Verification Loop (μετά την εκτέλεση)
 
@@ -746,7 +749,18 @@ Selection cascade: **L4 > L3 > L2 > L1**. Μόνο ένα level ανά cycle (π
 
 **Σκοπός:** Συνέχεια από προηγούμενο cycle (όχι τυποποιημένο). Focus στο πιο ώριμο asset, σύντομη αναφορά στα άλλα 3, plain Greek χωρίς abbreviations.
 
-**ΥΠΟΧΡΕΩΤΙΚΟ pre-step:** Διάβασε `GOLD_TACTIC/data/briefing_log.md` (last 30 lines) **πριν** γράψεις το message. Βρες τιμή focus_sym στον προηγούμενο cycle, τι κατάσταση είχε, ποια κριτήρια άλλαξαν. Αυτά τροφοδοτούν το `📖` continuity section.
+**ΥΠΟΧΡΕΩΤΙΚΟ pre-step (B2 — 30/04/2026):**
+
+1. **Πρώτη πηγή** — διάβασε `GOLD_TACTIC/data/delta_since_last_cycle.json`. Αυτό περιέχει ντετερμινιστικά υπολογισμένα deltas (price/TRS/criteria flips) για κάθε asset, με χρόνο που πέρασε από το προηγούμενο snapshot. Χρησιμοποίησε τα **πρωτίστως** για το `📖 Από το προηγούμενο cycle` section. Πεδία:
+   - `summary_line` — έτοιμη 1-line περίληψη σε plain Greek (μπορεί να χρησιμοποιηθεί απευθείας)
+   - `per_asset[SYM].price_prev_fmt → price_now_fmt (delta_pct%)` — ακριβές price delta
+   - `per_asset[SYM].trs_change` — π.χ. "3→4" αν TRS άλλαξε
+   - `per_asset[SYM].criteria_now_true` / `criteria_now_false` — ποιά κριτήρια flip-αραν
+   - `stable_streak: true` → καμία ουσιαστική αλλαγή · χρησιμοποίησε compact narrative
+
+2. **Δεύτερη πηγή (richer context)** — διάβασε `GOLD_TACTIC/data/briefing_log.md` (last 30 lines) για narrative που δεν μπορεί να εξαχθεί από numbers (π.χ. "δοκίμασε 3 φορές το επίπεδο", "νέο νέο εμφανίστηκε στις 13:42").
+
+Συνδύασε τα δύο: numbers από delta JSON + narrative από briefing_log = ολοκληρωμένη `📖` συνέχεια.
 
 ```
 👁️ <b>Παρακολούθηση</b> · {HH:MM}  ·  {SESSION_TAG}

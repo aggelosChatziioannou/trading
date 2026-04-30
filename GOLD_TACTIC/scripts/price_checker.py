@@ -19,8 +19,11 @@ import re
 import traceback
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
+
+# EET timezone — fixes UTC-vs-EET timestamp drift (2026-04-29)
+EET = timezone(timedelta(hours=3))
 
 try:
     from dotenv import load_dotenv
@@ -45,7 +48,7 @@ def log_error(source, error):
     """Log errors to file for debugging scheduled runs."""
     try:
         with open(ERROR_LOG, "a", encoding="utf-8") as f:
-            f.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {source}: {error}\n")
+            f.write(f"[{datetime.now(EET).strftime('%Y-%m-%d %H:%M:%S')}] {source}: {error}\n")
     except:
         pass
 
@@ -54,9 +57,9 @@ ASSETS = {
     "GBPUSD": {"yf": "GBPUSD=X",  "yahoo_id": "GBPUSD=X",  "fmt": ".4f",  "range": (1.15, 1.45),    "td": "GBP/USD"},
     "USDJPY": {"yf": "JPY=X",     "yahoo_id": "JPY=X",     "fmt": ".2f",  "range": (120, 170),      "td": "USD/JPY"},
     "AUDUSD": {"yf": "AUDUSD=X",  "yahoo_id": "AUDUSD=X",  "fmt": ".4f",  "range": (0.55, 0.80),    "td": "AUD/USD"},
-    "XAUUSD": {"yf": "GC=F",      "yahoo_id": "GC=F",      "fmt": ",.2f", "range": (1800, 6000),    "td": "XAU/USD"},
-    "NAS100": {"yf": "NQ=F",      "yahoo_id": "NQ=F",      "fmt": ",.2f", "range": (15000, 30000),  "td": None},
-    "SPX500": {"yf": "ES=F",      "yahoo_id": "ES=F",      "fmt": ",.2f", "range": (4000, 7000),    "td": None},
+    "XAUUSD": {"yf": "GC=F",      "yahoo_id": "GC=F",      "fmt": ",.2f", "range": (1800, 8000),    "td": "XAU/USD"},
+    "NAS100": {"yf": "NQ=F",      "yahoo_id": "NQ=F",      "fmt": ",.2f", "range": (15000, 40000),  "td": None},
+    "SPX500": {"yf": "ES=F",      "yahoo_id": "ES=F",      "fmt": ",.2f", "range": (3500, 9500),    "td": None},
     "BTC":    {"yf": "BTC-USD",   "yahoo_id": "BTC-USD",   "fmt": ",.0f", "range": (30000, 200000), "td": "BTC/USD"},
     "ETH":    {"yf": "ETH-USD",   "yahoo_id": "ETH-USD",   "fmt": ",.2f", "range": (1000, 8000),    "td": "ETH/USD"},
     "SOL":    {"yf": "SOL-USD",   "yahoo_id": "SOL-USD",   "fmt": ",.2f", "range": (30, 400),       "td": "SOL/USD"},
@@ -159,7 +162,7 @@ def check_data_staleness():
         with open(outfile, 'r', encoding='utf-8') as f:
             prev = json.load(f)
         prev_time = datetime.strptime(prev["timestamp"], "%Y-%m-%d %H:%M:%S")
-        age_min = (datetime.now() - prev_time).total_seconds() / 60
+        age_min = (datetime.now(EET) - prev_time.replace(tzinfo=EET) if prev_time.tzinfo is None else datetime.now(EET) - prev_time).total_seconds() / 60
         return age_min > 45, round(age_min, 1)
     except Exception:
         return False, 0.0
@@ -272,7 +275,7 @@ def check_all(asset_filter=None, output_json=False):
 
     results = {}
     print(f"GOLD TACTIC — Live Price Checker")
-    print(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"Time: {datetime.now(EET).strftime('%Y-%m-%d %H:%M:%S')}")
     print()
 
     for name, config in assets_to_check.items():
@@ -292,7 +295,7 @@ def check_all(asset_filter=None, output_json=False):
 
     # Save
     output = {
-        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "timestamp": datetime.now(EET).strftime("%Y-%m-%d %H:%M:%S"),
         "twelvedata_active": bool(td_prices),
         "prices": results,
     }

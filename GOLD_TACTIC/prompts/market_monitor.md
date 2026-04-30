@@ -17,11 +17,48 @@ Your goals:
 
 ---
 
-## STEP 1 — Read Selected Assets
+## STEP 0 — Coordination Lock Check (MANDATORY first step)
+
+**Πριν διαβάσεις ή τρέξεις τίποτα**, έλεγξε αν τρέχει αυτή την στιγμή Selector schedule:
+
+```bash
+python GOLD_TACTIC/scripts/cycle_coordinator.py monitor-start
+```
+
+- **Exit 0** → προχώρα κανονικά.
+- **Exit 2** → Selector active, **skip αυτό το cycle**. Στείλε ένα silent Telegram:
+  ```
+  ⏸️ <i>Monitor skip — Selector {run_name} τρέχει ({age}s). Επόμενο cycle θα διαβάσει τα νέα assets.</i>
+  ```
+  Έπειτα exit. Όχι περαιτέρω βήματα.
+
+**Auto-recovery:** Αν το Selector lock είναι >5 λεπτών παλιό, ο coordinator το θεωρεί stale και το καθαρίζει. Συνέχισε normal flow.
+
+---
+
+## STEP 1 — Read Selected Assets + Selector Reference
 
 ```
 Read: GOLD_TACTIC/data/selected_assets.json
+Read: GOLD_TACTIC/data/selector_done.json   (optional — last selector summary)
 ```
+
+```bash
+# Generate the "Watched by ... Selector @HH:MM" line for ALL Tier headers
+python GOLD_TACTIC/scripts/cycle_coordinator.py selector-ref-line > GOLD_TACTIC/data/selector_ref.txt
+```
+
+Το `selector_ref.txt` περιέχει γραμμή τύπου:
+```
+🎯 <i>Watched: <b>AM Selector</b> @08:00 (4h12' ago) — XAU·EUR·BTC·NAS</i>
+```
+
+**Όλα τα Tier messages (L1/L2/L3/L4)** πρέπει να έχουν αυτή τη γραμμή **αμέσως μετά τον τίτλο** (πριν τα asset details). Αυτό απαντά στην ερώτηση "ποιος Selector παρήγαγε τα τρέχοντα 4 assets" σε κάθε μήνυμα.
+
+**Staleness colors:**
+- 🎯 = Selector <9h ago (φρέσκος)
+- 🟡 = 9-12h ago (παλιός — π.χ. EVE 21:00 ακόμα ισχύει για overnight crypto)
+- 🔴 = >12h ago (πολύ παλιός — έλεγξε αν έτρεξε ο Selector)
 
 If `selected` array is empty or file is missing → send Telegram:
 "Δεν έχουν επιλεγεί assets ακόμα. Αναμονή για Asset Selector."
@@ -31,7 +68,9 @@ Extract the 4 selected symbols (e.g., XAUUSD, EURUSD, BTC, SOL).
 
 ---
 
-## STEP 2 — Fetch Fresh Data (Python)
+## STEP 2 — Fetch Fresh Data (MANDATORY — never skip)
+
+**🔴 ΥΠΟΧΡΕΩΤΙΚΗ ΕΚΤΕΛΕΣΗ ΟΛΩΝ των παρακάτω scripts σε ΚΑΘΕ cycle.** Δεν επιτρέπεται skip επειδή "τα αρχεία υπάρχουν ήδη" ή "τα έχω από προηγούμενο cycle". Το `data_health.py` στο STEP 2.7 ελέγχει freshness και **θα μπλοκάρει το trading** αν λείπει refresh — γι' αυτό ΠΡΕΠΕΙ να τρέξουν.
 
 Run these for the selected assets only:
 
@@ -40,12 +79,85 @@ python GOLD_TACTIC/scripts/price_checker.py --assets XAUUSD,EURUSD,BTC,SOL
 python GOLD_TACTIC/scripts/news_scout_v2.py --light
 python GOLD_TACTIC/scripts/ghost_trades.py --check
 python GOLD_TACTIC/scripts/quick_scan.py --json XAUUSD EURUSD BTC SOL
-python GOLD_TACTIC/scripts/session_check.py > GOLD_TACTIC/data/session_now.json
+python GOLD_TACTIC/scripts/session_check.py
 ```
 
-**Note:** `trs_history.py` runs AFTER STEP 4 (needs computed TRS values — see STEP 6.5).
+> Note: `session_check.py` γράφει αυτόνομα στο `data/session_now.json` (δεν χρειάζεται shell redirect). `trs_history.py` runs AFTER STEP 4 (see STEP 6.5).
 
-If a script fails, read the last saved JSON instead (stale data). Note staleness.
+### 🔁 Verification Loop (μετά την εκτέλεση)
+
+**ΠΑΝΤΑ** τρέξε το STEP 2.7 (`data_health.py`) ΑΜΕΣΩΣ μετά τα παραπάνω. Αν δεις CRITICAL stale σε οποιοδήποτε από τα 4 fast-cycle αρχεία, **ξανατρέξε** το αντίστοιχο script:
+
+| Stale file | Re-run command |
+|---|---|
+| `live_prices.json` | `python GOLD_TACTIC/scripts/price_checker.py --assets ...` |
+| `quick_scan.json` | `python GOLD_TACTIC/scripts/quick_scan.py --json ...` |
+| `session_now.json` | `python GOLD_TACTIC/scripts/session_check.py` |
+| `news_feed.json` | `python GOLD_TACTIC/scripts/news_scout_v2.py --light` |
+
+**Retry budget:** μέχρι 2 επαναλήψεις ανά script. Αν μετά από 2 retries παραμένει CRITICAL stale, **τότε** εφάρμοσε τα STEP 2.7 CRITICAL rules (Tier B force, no new trades, banner prepend).
+
+### ❌ Forbidden Patterns
+
+- **ΛΑΘΟΣ:** "Το `quick_scan.json` υπάρχει ήδη — δεν χρειάζεται να ξανατρέξω" → μπορεί να είναι 80' παλιό
+- **ΛΑΘΟΣ:** Skip `price_checker.py` επειδή έτρεξε σε προηγούμενο cycle → κάθε cycle απαιτεί fresh refresh
+- **ΛΑΘΟΣ:** Παράλειψη `session_check.py` επειδή "η ώρα δεν άλλαξε" → το mtime πρέπει να ανανεωθεί ή το `session_now.json` βαράει stale
+- **ΛΑΘΟΣ:** Συνέχεια στο STEP 3 χωρίς πρώτα να τρέξει το STEP 2.7 verification
+
+### ⚠️ Αν script όντως αποτύχει
+
+Δεν είναι το ίδιο με skip. Αν π.χ. ο `price_checker.py` πέσει με exception (δίκτυο, API limit), τότε:
+1. Σημείωσε στο cycle log ποιο script απέτυχε και γιατί
+2. Συνέχισε με τα cached δεδομένα (το αρχείο θα είναι stale)
+3. Το data_health.py θα δείξει CRITICAL → STEP 2.7 rules κουμπώνουν αυτόματα (no new trade)
+4. **Μην προσποιηθείς ότι έτρεξε επιτυχώς** — η transparency είναι σημαντικότερη από τη σιωπηλή αποτυχία
+
+---
+
+## STEP 2.6 — Honest Error Reporting (CRITICAL — ban hallucinations)
+
+🔴 **Όταν ένα script δεν τρέχει επιτυχώς, ΑΠΑΓΟΡΕΥΕΤΑΙ να κατασκευάσεις error message.** Αυτό είναι το πιο σοβαρό violation γιατί κάνει το debugging αδύνατο για τον user.
+
+### ❌ Forbidden patterns (παραδείγματα από real incidents)
+
+- "**SyntaxError line N**" χωρίς να έχεις πραγματική stderr απόδειξη από Python interpreter. Στις 30/04/2026 το σύστημα ανέφερε ψευδώς `quick_scan.py SyntaxError L615`, `news_scout_v2.py SyntaxError L732`, `session_check.py SyntaxError L121`, `trs_history.py SyntaxError L102` για 10 ώρες — όλα τα scripts παρσάρουν τοπικά κανονικά. Αποτέλεσμα: 10ωρο ψευδές PAUSE.
+- "**unterminated JSON**" χωρίς να έχεις δείξει το `json.JSONDecodeError` traceback
+- "**FAILED**" χωρίς verbatim error μήνυμα από stderr
+- "**fetch αποτυχία**" χωρίς το HTTP status / exception class
+- Οποιαδήποτε τεχνική αναφορά (`L<number>`, `SyntaxError`, `ImportError`, "corrupted") χωρίς να έχεις τρέξει το script ΚΑΙ να έχεις δει το πραγματικό error
+
+### ✅ Required behavior
+
+1. **Αν έτρεξες το script ΚΑΙ απέτυχε**: capture stderr verbatim. Report ως:
+   ```
+   ❌ {script.py}: <stderr_first_3_lines verbatim>
+   exit_code=N
+   ```
+   Παράδειγμα:
+   ```
+   ❌ price_checker.py: HTTPError 429 Too Many Requests on yahoo-web
+   exit_code=1
+   ```
+
+2. **Αν ΔΕΝ μπόρεσες να τρέξεις Bash καθόλου** (sandbox restriction, no working_dir, missing python): Report ακριβώς:
+   ```
+   ⚠️ cmd_blocked: cannot execute scripts in this sandbox
+   reason: <one-line factual reason if known, e.g., "Bash tool not in allowed_tools" / "working_directory not set" / "python not found in PATH">
+   ```
+   Σε αυτή την περίπτωση **ΣΤΑΜΑΤΑ τον retry loop** του STEP 2 — δεν έχει νόημα. Συνέχισε με stale cached data. Η εμφάνιση του `cmd_blocked` σε διαδοχικά cycles είναι σημάδι ότι ο χρήστης πρέπει να ελέγξει το Cowork schedule config.
+
+3. **Αν το script έτρεξε αλλά exit code != 0**: include και το exit_code και τις πρώτες 3 γραμμές stderr. Μην το αναφέρεις ως "FAILED" σκέτο.
+
+4. **Διαφοροποίηση** στο message:
+   - "δεν έτρεξε" (sandbox issue) → user πρέπει να ελέγξει schedule config
+   - "έτρεξε & errored" (real bug) → user πρέπει να φτιάξει το script
+   - Αυτές οι δύο κατηγορίες έχουν εντελώς διαφορετική remediation — μη τις μπερδεύεις
+
+### Rule of thumb
+
+> **Δεν αναφέρω ποτέ τεχνικό error που ΔΕΝ έχω δει.** Αν δεν έχω stderr στα χέρια μου, τότε γράφω ή `cmd_blocked` ή απλά "δεν εκτελέστηκε". Σε καμία περίπτωση δεν εφευρίσκω `SyntaxError L<number>`, `ImportError`, `unterminated JSON`, ή άλλο technical-sounding error message.
+
+Αν παραβείς αυτόν τον κανόνα, ο χρήστης θα κυνηγά για ώρες ένα bug που δεν υπάρχει — όπως έγινε στις 30/04/2026.
 
 ---
 
@@ -62,6 +174,38 @@ If a script fails, read the last saved JSON instead (stale data). Note staleness
 | `weekend` | Σαββατοκύριακο | ίδιο με `crypto_only` |
 
 Session tag γραμμή (HTML): τη δίνει το `session_check.py --line`. Θα μπει ΠΑΝΤΑ στο header Tier B/C.
+
+---
+
+## STEP 2.7 — Data Health Check (T1.1 stale detection)
+
+**Δες πρώτα το STEP 2 verification loop** — το data_health.py εδώ είναι ο ελεγκτής που τροφοδοτεί αυτόν τον βρόχο. Αν δεις CRITICAL stale σε ένα από τα 4 fast-cycle αρχεία (`live_prices`, `quick_scan`, `session_now`, `news_feed`), **πρώτα** ξανατρέξε το script και ξανα-τρέξε αυτό το step. Μόνο αν παραμείνει CRITICAL μετά από 2 retries εφαρμόζεις τους blocking κανόνες παρακάτω.
+
+Μετά τα fetches του STEP 2, **πάντα τρέξε**:
+
+```bash
+python GOLD_TACTIC/scripts/data_health.py --json > GOLD_TACTIC/data/data_health.json
+python GOLD_TACTIC/scripts/data_health.py --banner > GOLD_TACTIC/data/data_health_banner.txt
+python GOLD_TACTIC/scripts/data_health.py --line > GOLD_TACTIC/data/data_health_line.txt
+```
+
+**Διάβασε** το `data_health.json` για να πάρεις:
+- `overall_status`: `HEALTHY` / `DEGRADED` / `CRITICAL`
+- `files`: λίστα με `{file, age_minutes, stale, criticality, source_script}`
+
+### Banner εφαρμογή
+- **`HEALTHY`** → δεν εμφανίζεται banner. Στα Tier A footer βάζεις `💚 Data: N/M fresh` από το `data_health_line.txt`.
+- **`DEGRADED`** (warn-stale only) → Tier A footer δείχνει `🟡 Data: N/M fresh (Z warn)`. Στα Tier B/C, εμφάνισε στο pre-news section μια discrete warning γραμμή: `⚠️ {file} stale ({age}min)`.
+- **`CRITICAL`** → ΣΕ ΟΛΑ τα tiers (A/B/C), πρόσθεσε ΑΜΕΣΩΣ μετά το header το ολόκληρο banner από το `data_health_banner.txt`. Ο χρήστης πρέπει να δει τι σπάει.
+
+### Critical-status decision rules
+**Αν `overall_status == "CRITICAL"`:**
+1. **ΜΗΝ ανοίξεις νέο trade** σε αυτό το cycle (skip STEP 5.7) — δεν έχεις αξιόπιστα δεδομένα.
+2. **Συνέχισε normal tick** των open trades (STEP 5.8) — αυτά χρησιμοποιούν last cached price που δίνει ένδειξη.
+3. **Tier override:** force Tier B (delta) για να φωνάξει στον χρήστη — όχι silent Tier A.
+4. Στο τέλος του message, prefix-άρισε `🛑 PAUSE: trade execution disabled λόγω stale data` πριν τα contact links.
+
+**Αν `overall_status == "DEGRADED"`:** συνέχισε normal flow, απλά δείξε το warn banner.
 
 ---
 
@@ -174,6 +318,48 @@ If no recent HIGH impact event: skip this step.
 
 ---
 
+## STEP 4.85 — News Embargo Gate (T1.2 / Phase B1)
+
+**Πριν** το STEP 5.7 (auto-open), έλεγχος embargo για HIGH-impact economic events:
+
+```bash
+python GOLD_TACTIC/scripts/news_embargo.py --json > GOLD_TACTIC/data/embargo_state.json
+python GOLD_TACTIC/scripts/news_embargo.py --banner > GOLD_TACTIC/data/embargo_banner.txt
+python GOLD_TACTIC/scripts/news_embargo.py --line > GOLD_TACTIC/data/embargo_line.txt
+```
+
+Διάβασε `embargo_state.json` → field `overall_state` και `allow_trade`:
+
+| State | Παράθυρο | Action |
+|-------|----------|--------|
+| **CLEAR** | Δεν υπάρχει HIGH event στο T-30..T+5 | ✅ Trades επιτρέπονται. Αν υπάρχει επερχόμενο HIGH σε <4h, δείξε countdown στο footer. |
+| **PENDING** | HIGH event T-30 → T-1 | 🛑 ΟΧΙ νέα trades. Existing trades παραμένουν με stricter monitoring. |
+| **EVENT** | HIGH event T-1 → T+1 | ⚡ ΟΧΙ νέα trades. Alert χρήστη. |
+| **POST** | HIGH event T+1 → T+5 | 🚧 ΟΧΙ νέα trades. Παρατήρηση spread/volatility. |
+
+### Embargo enforcement σε Tier C (STEP 5.7)
+Αν `allow_trade == False` και το cycle θα παρήγαγε Tier C signal (TRS≥4 σε optimal KZ):
+1. **ΜΗΝ τρέξεις** `trade_manager.py open` — skip.
+2. **Downgrade** σε Tier B με τίτλο `📊 ΚΟΝΤΑ ΣΕ SIGNAL · {ASSET}` αντί `🔥 ΣΗΜΑ`.
+3. Στο message, prepend τον banner από `embargo_banner.txt` αμέσως μετά το header.
+4. Πρόσθεσε γραμμή: `⏳ Setup ώριμο αλλά μπλοκαρισμένο από news embargo. Resume @ T+5 (~{abs_minutes_until_resume}').`
+
+### Embargo footer στα Tier A/B/C
+Πάντα δείξε γραμμή από `embargo_line.txt`:
+- CLEAR + κανένα upcoming → `📅 News: clear`
+- CLEAR + upcoming HIGH < 4h → `📅 Next HIGH: {title} σε {N}'`
+- BLOCKED → `🛑 EMBARGO PENDING/EVENT/POST: {title} ...`
+
+### Existing trades during embargo
+- **Δεν κλείνουμε** existing trades απλώς επειδή embargo. Συνεχίζουμε normal tick().
+- **Tighter SL trail (Phase 2)** — για τώρα, monitoring continues όπως πριν.
+- **Aldready hit TP/SL** → trade closes κανονικά (embargo δεν κρατάει trade).
+
+### Audit
+Κάθε φορά που ενεργοποιείται embargo → log εγγραφή στο `data/embargo_log.jsonl` (γίνεται αυτόματα από το script). Audit-trail για post-mortem.
+
+---
+
 ## STEP 4.95 — Render Open-Trades Header (πάντα)
 
 **ΠΡΙΝ** συνθέσεις οποιοδήποτε Tier A/B/C message, τρέξε:
@@ -191,149 +377,271 @@ python GOLD_TACTIC/scripts/trade_manager.py header
 
 ---
 
-## STEP 5 — Compose Telegram Message (v7.1 — 3-tier adaptive)
+## STEP 5 — Compose Telegram Message (v7.2 UX redesign — 6 criticality levels)
 
-Διαλέγεις **ακριβώς ένα από 3 tiers** ανάλογα με το τι άλλαξε. Στέλνεις με:
+> **Σχεδιαστική φιλοσοφία:** Mobile-first, group-friendly, scannable. Κάθε επίπεδο έχει συγκεκριμένο "βάρος" που ανεβαίνει με την κρισιμότητα: από silent pulse μέχρι trade signal με fire effect. **Σκέψου ομάδα ατόμων που σκρολλάρει το κανάλι** — η πρώτη γραμμή πρέπει να λέει τα πάντα σε 1.5".
 
-```bash
-python GOLD_TACTIC/scripts/telegram_sender.py message "<text>"                       # Tier B (default notify)
-python GOLD_TACTIC/scripts/telegram_sender.py message "<text>" --silent               # Tier A (no notification)
-python GOLD_TACTIC/scripts/telegram_sender.py message "<text>" --effect fire          # Tier C + TRS 5 signal
-```
+### 5.0 — Official Emoji Palette (LOCKED — μην χρησιμοποιήσεις άλλα)
 
-### Tier selection logic
+| Σημασία | Emoji | Πότε |
+|---------|-------|------|
+| Bullish / Long / Win / θετικό | 🟢 | TRS≥4, LONG, win exit |
+| Bearish / Short / Loss / αρνητικό | 🔴 | SL hit, SHORT, error |
+| Caution / Pending / Warning | 🟡 | TRS=3, embargo PENDING, partial issue |
+| Neutral / Info / Inactive | ⚪ | TRS≤2, BE exit, no impact |
+| Pulse / Heartbeat / Quiet | ❄️ | L1 PULSE messages |
+| Watch / Anticipation | 👁️ | L2 WATCH messages |
+| Setup forming | 🎯 | L3 SETUP, TP targets |
+| Signal fired | 🔥 | L4 SIGNAL (TRS=5 trade) |
+| Live trade | 💓 | L5 progress milestones |
+| Closure | 🏁 | L6 EXIT messages |
+| TP hit (single) | 🎯 | TP1 BE upgrade |
+| TP2 hit (runner success) | 🎯🎯 | TP2 close |
+| SL hit | 💀 | Loss exit |
+| Break-even / Protected | 🛡️ | BE exit, SL→entry |
+| Timeout / Max hold | ⌛ | 4h timeout exit |
+| Launch / Runner | 🚀 | Launch protocol |
+| Probe (half-size) | 🧪 | Probe trade open |
+| Confirm (scale-in) | 🔥+ | Confirm on probe |
+| Open trade entry | 📥 | trade_manager header |
+| Pass criterion | ✅ | TRS criterion met |
+| Fail criterion | ❌ | TRS criterion missed |
+| News / Article | 📰 | News section |
+| Sources / Polled | 📡 | Sources footer |
+| Calendar / Time | ⏰ | Event countdown |
+| Sentiment / Heat | 🌡️ | F&G footer |
+| Health / Status | 🩺 | System health line |
+| Risk-on regime | ⚡ | regime label |
+| Risk-off regime | 🛡️ | regime label |
+| Neutral regime | 😐 | regime label |
+| Daily stop hit | 🛑 | Halt notice |
 
-| Αν... | Tier | Notification |
-|-------|------|--------------|
-| Κανένα TRS δεν άλλαξε κατηγορία ΚΑΙ max price move < 0.3% ΚΑΙ κανένα νέο HIGH/MED | **A — Heartbeat** | silent |
-| Κάποιο TRS άλλαξε (π.χ. 3→4) Ή price move ≥ 0.3% Ή νέο HIGH/MED news | **B — Delta** | normal |
-| Κάποιο asset έφτασε TRS **≥ 4** (actionable setup) | **C — Full Signal** | normal (+ fire effect αν TRS=5) |
+**ΚΑΝΟΝΑΣ:** Max 7 emojis ανά visible part. Excess → looks like spam bot. Ομαδικό κανάλι = professional vibe.
 
-Αν ταυτόχρονα πληρούν Tier B και Tier C → επιλέγεις **C** (υψηλότερης προτεραιότητας).
+### 5.0.1 — TRS Criteria Vocabulary + Plain-Greek Translation (NEW)
 
-### TRS Criteria Vocabulary (σταθερή ορολογία ΠΑΝΤΟΥ)
+Σε **κάθε επίπεδο** και στο Dashboard χρησιμοποιούμε σταθερές ετικέτες (TF · RSI · ADR · News · Key). **Στο L4 SIGNAL** όμως πρέπει να εξηγήσεις σε **απλά Ελληνικά** για κάποιον που δεν ξέρει trading. Χρησιμοποίησε **ακριβώς αυτές τις φράσεις** (παραλλαγές OK ανά context):
 
-Σε **κάθε tier** και στο Dashboard χρησιμοποιούμε την ΙΔΙΑ σύντομη ετικέτα για τα 5 criteria, ώστε ο χρήστης να τα μαθαίνει ασυνείδητα:
+| Short | Τεχνικός κανόνας | **Plain Greek φράση για L4 SIGNAL** |
+|-------|------------------|--------------------------------------|
+| **TF** Timeframe | Daily + 4H aligned | "Η τάση είναι ξεκάθαρη και στις δύο πιο σημαντικές χρονικές κλίμακες — το γράφημα 'συμφωνεί' με τον εαυτό του." |
+| **RSI** | 30-70 προς την bias | "Δείκτης δύναμης σε υγιή ζώνη: ούτε υπεραγορασμένο, ούτε εξαντλημένο — υπάρχει χώρος για κίνηση." |
+| **ADR** | ≥ 30% remaining | "Έχουμε αρκετό 'καύσιμο' σήμερα — το asset δεν εξάντλησε ακόμα το ημερήσιο του εύρος." |
+| **News** | Supportive/neutral | "Δεν υπάρχει είδηση που να μας εμποδίζει — οι πηγές υψηλής αξιοπιστίας ή σιωπούν ή στηρίζουν την κατεύθυνση." |
+| **Key** Key Level | Within 1% από entry | "Είμαστε ακριβώς στο σημείο που η τιμή ιστορικά αντιδρά — το βέλτιστο σημείο εισόδου με χαμηλό ρίσκο." |
 
-| # | Short label | Full meaning | Pass rule |
-|---|-------------|--------------|-----------|
-| 1 | **TF** (Timeframe) | Daily + 4H aligned | Same direction |
-| 2 | **RSI** | RSI favorable | 30-70 προς την bias |
-| 3 | **ADR** | ADR remaining | ≥ 30% του ημερήσιου εύρους |
-| 4 | **News** | News supportive/neutral | Χωρίς contra-catalyst |
-| 5 | **Key** (Key level) | Near key level / trigger | Εντός 1% από entry zone |
+### 5.0.2 — Cohesion Rules (όλα τα levels)
 
-Format convention παντού: `✅ TF  ❌ RSI  ✅ ADR  ✅ News  ❌ Key` (pass/fail ανά criterion). ΠΟΤΕ μην στείλεις TRS αριθμό χωρίς τα 5 criteria δίπλα.
+1. **Πρώτη γραμμή = scannable summary** — ο χρήστης πρέπει να ξέρει σε 1.5" τι αφορά το μήνυμα. Format: `{LEVEL_EMOJI} <b>{ACTION}</b> · {DETAIL}`.
+2. **Bold μόνο για ιεραρχία** — τίτλος, key numbers, criterion labels. ΠΟΤΕ ολόκληρες προτάσεις σε bold (γίνεται κουραστικό στο mobile).
+3. **Code blocks `<code>` για prices/IDs** — μονοσπατιαία γραφή = επαγγελματική εμφάνιση + tap-to-copy.
+4. **Major divider `━━━━━━━━━━━━` σε L3/L4/L6** μόνο — χωριστική γραμμή ΜΟΝΟ μετά τον τίτλο. Όχι ποτέ 2+ dividers στο ίδιο μήνυμα.
+5. **Minor break = δύο newlines** μεταξύ sections. ΟΧΙ έντονοι divider chars στο εσωτερικό.
+6. **HTML escaping** — κάθε `&` → `&amp;`, κάθε `<`/`>` σε δυναμικό text → `&lt;`/`&gt;`.
+7. **Expandable blockquote** για deep details (πηγές, τεχνική ανάλυση) → ο χρήστης το ανοίγει αν θέλει. Mobile-friendly.
+8. **Πάντα clickable links + ώρα δημοσίευσης** — άρθρα ΠΑΝΤΑ έχουν την ώρα έκδοσης πάνω από το link (ο χρήστης πρέπει να ξέρει αμέσως πόσο φρέσκο είναι).
+   - **Default (όλα τα expanded news sections):**
+     ```
+     🕐 <i>{age_human} · {published_label}</i>
+     <a href="{url}">"{headline}"</a> <i>({source} T{tier})</i>
+     ```
+   - **Compact (tight bullet lists όπου ο χώρος είναι πολύ περιορισμένος):** inline format επιτρέπεται:
+     `• <a href="{url}">"{headline}"</a> 🕐 <i>{age_human}</i> · <i>({source} T{tier})</i>`
+   - Τα πεδία `age_human` (π.χ. `"15λ πριν"`, `"2ω πριν"`, `"1μ πριν"`), `published_label` (π.χ. `"30/04 14:30 EET"`) και `epoch` (sortable int) υπάρχουν ήδη σε ΚΑΘΕ άρθρο στο `news_feed.json`.
+   - **Σειρά εμφάνισης:** το `news_feed.json` είναι **ήδη ταξινομημένο** ανά `(tier weight desc, epoch desc)` — δηλαδή Tier 1 πρώτα, και μέσα σε κάθε tier τα νεότερα πάνω. **Σεβάσου τη σειρά** — μην αναδιατάξεις.
+9. **Footer πάντα στο τέλος, σταθερή σειρά:** event countdown → sentiment → health → sources blockquote.
+10. **Length cohesion:** L1=250 / L2=500 / L3=750 / L4=1100 / L5=350 / L6=500 chars. Συνέπεια = προσδοκία.
+
+### 5.0.3 — Level Selection Matrix
+
+Διαλέγεις **ένα από 4 outbound levels** ανάλογα με το τι συμβαίνει. (Τα L5 LIVE και L6 EXIT εκπέμπονται αυτόματα από `trade_manager.py tick`/`close` — δεν τα γράφεις εσύ.)
+
+| Επίπεδο | Πότε | Char | Notification | Effect |
+|---------|------|------|--------------|--------|
+| **L1 — ❄️ PULSE** | Όλα ήρεμα: κανένα TRS bucket flip + Δp<0.3% + κανένα νέο HIGH/MED | ~250 | silent | — |
+| **L2 — 👁️ WATCH** | TRS bucket flip Ή Δp 0.3-0.7% Ή νέο HIGH/MED news αλλά κανένα TRS≥4 σε optimal KZ | ~500 | silent | — |
+| **L3 — 🎯 SETUP** | Asset σε **TRS=4** σε **optimal KZ** + 1 criterion missing → προετοιμασία trade | ~750 | normal | — |
+| **L4 — 🔥 SIGNAL** | Asset σε **TRS=5** → **trade just opened** (ή upcoming) | ~1100 | normal | `fire` (TRS=5) |
+
+Selection cascade: **L4 > L3 > L2 > L1**. Μόνο ένα level ανά cycle (πολλαπλά L4 = πολλά μηνύματα, ένα ανά asset).
+
+### 5.0.4 — Cycle Stale-Data / Embargo Override
+- **Critical stale data** (`data_health.overall_status == "CRITICAL"`): force **L2 WATCH** ακόμα και αν θα έβγαζε L1. Prepend `data_health_banner.txt`.
+- **Embargo PENDING/EVENT/POST**: αν θα έβγαζε L4, **downgrade σε L3** με embargo banner. Skip auto-open.
 
 ---
 
-### Tier A — Heartbeat (~450 chars, silent)
+### L1 — ❄️ PULSE (Heartbeat) · ~280 chars · silent
+
+**Σκοπός:** Group-safe pulse. Ο χρήστης ξέρει ότι το σύστημα ζει χωρίς ειδοποίηση. Ένα tap reveals.
 
 ```
-📡 <b>{HH:MM}</b> · Όλα σταθερά
-🟢 XAU 4/5 · 📈 LONG · πιθανότητα 80%
-   (✅TF ✅RSI ✅ADR ✅Key ❌News)
-🟡 EUR 3/5 · 📈 LONG · 60%
-   (✅TF ❌RSI ✅ADR ✅News ❌Key)
-🟡 BTC 3/5 · 📈 LONG · 60%
-   (✅TF ✅RSI ❌ADR ✅News ❌Key)
-🟡 SOL 2/5 · 📈 LONG · 40%
-   (❌TF ✅RSI ✅ADR ❌News ❌Key)
+❄️ <b>{HH:MM}</b> · Όλα ήρεμα
+{SELECTOR_REF_LINE}
 
-📰 <b>Νέα</b>: Ίδια με πριν — κανένα καινούριο εδώ και {X} λεπτά
+🟢 XAU 4/5 · 🟡 EUR 3/5 · 🟡 BTC 3/5 · ⚪ SOL 2/5
 
-⏰ {NEXT_EVENT_COUNTDOWN}
+📰 News: ίδια εδώ και {X}'  ·  ⏰ Next: {event_short} σε {Y}'
+🩺 {DATA_HEALTH_LINE}  ·  📡 {ok}/{total} sources · {N_articles} άρθρα
 ```
 
-Color dots: 🟢 TRS 4-5 · 🟡 TRS 3 · ⚪ TRS 0-2.
-Probability = `TRS × 20` (π.χ. 4/5 → 80%). Πάντα δίπλα στο TRS.
-**Το News line είναι ΥΠΟΧΡΕΩΤΙΚΟ** — ακόμα και σε Tier A. Βλ. STEP 5.A.
+`{SELECTOR_REF_LINE}` = `cat GOLD_TACTIC/data/selector_ref.txt` — π.χ. `🎯 <i>Watched: <b>AM Selector</b> @08:00 (4h12' ago) — XAU·EUR·BTC·NAS</i>`
+
+**Κανόνες L1:**
+- Compact 4 assets σε 1 γραμμή (no criteria detail — το dashboard έχει τα πλήρη)
+- News line: αν >0 νέα HIGH/MED → upgrade σε L2 (δεν είσαι πια L1)
+- Footer: data health + sources στο ένα line
 
 ---
 
-### Tier B — Delta update (~700 chars, normal notify)
+### L2 — 👁️ WATCH (Delta + News) · ~530 chars · silent
+
+**Σκοπός:** "Κάτι κουνήθηκε αλλά όχι trade-actionable". Ομαδικό κανάλι: ο χρήστης μπορεί να skim-άρει.
 
 ```
-📡 <b>MONITOR</b> · {HH:MM}  ·  {SESSION_TAG}
+👁️ <b>WATCH</b> · {HH:MM}  ·  {SESSION_TAG}
+{SELECTOR_REF_LINE}
+
+🔼 BTC <b>+0.7%</b> @ <code>$76,420</code> → TRS 3→4 (πέρασε ADR)
+   ✅TF ✅RSI ✅ADR ✅News ❌Key
+
+📰 <b>ΝΕΟ</b>
+• <a href="{url}">"BTC ETF inflows $420M"</a> <i>(CoinDesk T1)</i> → 🟢 BTC HIGH (institutional demand)
+• <a href="{url}">"Fed dovish tone"</a> <i>(Reuters T1)</i> → 🟡 XAU MED (weaker $)
+
+🟢 XAU 4/5 · 🟡 EUR 3/5 · ⚪ SOL 2/5  <i>(stable)</i>
+
+⏰ ECB σε 2h40'  ·  🌡️ F&amp;G 72 · ⚡ RISK_ON
+🩺 💚 Healthy
+
+<blockquote expandable>📡 <b>Πηγές</b> ({ok}/{total} · {N} άρθρα · {pct_t1}% T1)
+✅ ForexLive · CoinDesk · Reuters · Investing · Reddit
+❌ Finnhub-general (timeout)</blockquote>
+```
+
+**Κανόνες L2:**
+- Πρώτη γραμμή μετά τον header: ΤΟ ΕΝΑ asset που άλλαξε (όχι όλα)
+- Τα υπόλοιπα 3 assets: 1 γραμμή compact "stable"
+- ΝΕΟ section: 1-3 articles με tier badge
+- Sources σε expandable blockquote (mobile-friendly)
+
+---
+
+### L3 — 🎯 SETUP (TRS=4 forming) · ~780 chars · normal notify
+
+**Σκοπός:** Anticipatory — "ετοιμάσου, σύντομα μπορεί να μπούμε". Ο χρήστης βλέπει WHY 4/5 + WHAT'S MISSING.
+
+```
+🎯 <b>SETUP · BTCUSD</b> · 4/5 σχηματίζεται · {SESSION_TAG}
+{SELECTOR_REF_LINE}
 ━━━━━━━━━━━━━━━━━━━━━━
-🔔 <b>ΑΛΛΑΓΕΣ</b>
-• XAU <b>3→4</b> 🔼 — πέρασε criterion "Near key level" (breakout retest $3,245)
-• BTC <b>-1.1%</b> 🔽 — έχασε criterion "ADR remaining" (consumed 72%)
 
-🟢 <b>XAU</b> 4/5 $3,245 (+0.8%)
-   ✅ TF  ✅ RSI  ✅ ADR  ✅ Key  ❌ News
-🟡 <b>EUR</b> 3/5 1.1345 (-0.2%)
-   ✅ TF  ❌ RSI  ✅ ADR  ✅ News  ❌ Key
-🟡 <b>BTC</b> 3/5 $68.4k (-1.1%)
-   ✅ TF  ✅ RSI  ❌ ADR  ✅ News  ❌ Key
-⚪ <b>SOL</b> 2/5 $145 (flat)
-   ❌ TF  ✅ RSI  ✅ ADR  ❌ News  ❌ Key
+📈 <b>LONG bias</b> @ <code>$76,420</code>  ·  Strategy: TJR Asia Sweep
 
-📰 <b>ΝΕΑ</b> (νέα από το τελευταίο cycle)
-• <a href="https://reuters.com/...">"Fed pause σε αυξήσεις"</a> <i>(Reuters)</i>
-   🟢 XAU HIGH — το dovish Fed αδυνατίζει το δολάριο, ανεβάζει τον χρυσό
-   🟡 EUR MED — λίγο bullish για ευρώ (USD softness)
-   ⚫ BTC/SOL — καμία άμεση επίπτωση
-• <a href="https://coindesk.com/...">"BTC ETF inflows $420M"</a> <i>(CoinDesk)</i>
-   🟢 BTC HIGH — συνεχιζόμενη εισροή θεσμικού χρήματος
-   🟡 SOL MED — θετικό κλίμα για alts
+<b>Τι έχουμε (4/5)</b>
+✅ <b>TF</b> — Daily+4H bullish, τάση καθαρή
+✅ <b>RSI</b> — 58 (όχι ακόμα υπεραγορασμένο)
+✅ <b>ADR</b> — 44% remaining (αρκετός χώρος)
+✅ <b>News</b> — CoinDesk T1: ETF inflows υποστηρίζει
+❌ <b>Key</b> — λείπει: τιμή 1.8% πάνω από retest $75,500
 
-⏰ ECB 14:00 (σε 2h40')
-🌡️ F&amp;G 72 · ⚡ RISK_ON
+<b>⏳ Τι περιμένουμε για 5/5</b>
+Pullback στο <code>$75,500</code> για retest → trigger LONG.
+ETA: ~30-90' στο NY KZ (15:30-17:30).
+
+🟡 EURUSD 3/5  ·  ⚪ AUD 2/5  ·  ⚪ NAS 2/5
+
+⏰ ECB σε 2h40'  ·  🌡️ F&amp;G 72 · ⚡ RISK_ON
+🩺 💚 Healthy
+
+<blockquote expandable>📰 <b>Νέα που στηρίζουν</b>
+• <a href="{url}">"BTC ETF inflows"</a> <i>(CoinDesk T1)</i> → 🟢 HIGH
+• <a href="{url}">"Fed dovish"</a> <i>(Reuters T1)</i> → 🟡 MED bullish
+
+📡 <b>Πηγές</b> ({ok}/{total} · {N} άρθρα · {pct_t1}% T1)</blockquote>
 ```
 
-**Αν δεν υπάρχουν νέα νέα από το προηγούμενο cycle**, αντί να γράψεις κενή section:
-```
-📰 <b>ΝΕΑ</b>: Δεν άλλαξε κάτι — τα τελευταία που κοίταξα:
-• <a href="{url1}">"{headline1}"</a> <i>({source1})</i> — παραμένει: {short impact}
-• <a href="{url2}">"{headline2}"</a> <i>({source2})</i> — παραμένει ουδέτερο
-```
+**Κανόνες L3:**
+- Πάντα 1 asset focus (το TRS=4 σε optimal KZ) — όχι spread σε 4 assets
+- "Τι έχουμε" + "Τι λείπει" δομή — εκπαιδεύει τον χρήστη
+- ETA estimate (από STEP 5.B logic)
+- Other 3 assets compact at footer
+- Tech analysis σε expandable
 
 ---
 
-### Tier C — Full Signal (~1200 chars + optional chart, fire effect αν TRS=5)
+### L4 — 🔥 SIGNAL (TRS=5 → trade opens) · ~1130 chars · normal + fire effect
+
+**Σκοπός:** Trade signal. **Μόνο το asset του signal** — όχι mention στα άλλα. Plain-Greek explanation των criteria. Ομαδικό κανάλι = κάποιοι στο group δεν ξέρουν trading, χρειάζονται εξηγήσεις.
 
 ```
-🔥 <b>ΣΗΜΑ · XAUUSD</b> ▰▰▰▰▰ 5/5  ·  {SESSION_TAG}
+🔥 <b>ΣΗΜΑ · BTCUSD</b> · 5/5 ▰▰▰▰▰ · {SESSION_TAG}
+{SELECTOR_REF_LINE}
 ━━━━━━━━━━━━━━━━━━━━━━
-🟢 <b>LONG</b> @ <code>3245.20</code>
-🎯 TP1 <code>3260.00</code>  <b>+148 pips</b>
-🎯 TP2 <code>3275.00</code>  +298 pips
-🛡️ SL  <code>3238.50</code>  −67 pips
-⚖️ R:R <b>1:2.2</b> · 💰 2% (20€): <b>0.09L</b> · 1%: 0.04L
-⏳ Max hold: 4h από είσοδο (αν δεν φτάσει TP → close break-even)
 
-<b>TRS breakdown (5/5)</b>
- ✅ <b>TF</b> — Daily+4H both BULL
- ✅ <b>RSI</b> — 58 (room to run προς bull)
- ✅ <b>ADR</b> — 42% remaining
- ✅ <b>News</b> — Fed dovish tone υποστηρίζει gold
- ✅ <b>Key</b> — 0.3% από breakout retest $3,245
+📈 <b>LONG</b> @ <code>$75,520</code>  ·  ⏳ Max hold 4h
 
-<b>💬 Με απλά λόγια</b>
-Ο χρυσός δοκιμάζει ξανά το επίπεδο $3.245 μετά από σπάσιμο. Αν κρατήσει και ανεβεί, έχουμε καλή ευκαιρία long. Όλα τα κριτήριά μας δείχνουν θετικά.
+{POSITION_EXPLAINER_BLOCK}   ← από `python position_explainer.py BTC LONG 75520 74955 76650 77780 0.026 1000`
 
-<b>⏳ Εκτίμηση χρόνου για 5/5</b> (ήδη στο 5/5) — ΕΤΟΙΜΟ ΤΩΡΑ
-<i>(Αν είμαστε 4/5: "~30-90' αναμονή ανάλογα τι λείπει — στο παρακάτω breakdown")</i>
+<b>📊 Γιατί το πήραμε — Όλα τα κριτήρια ✅</b>
 
-<blockquote expandable>📊 <b>Τεχνική λογική</b>
-Breakout retest σε $3,245 μετά από καθαρό κλείσιμο πάνω από $3,240 σε 4H. Volume confirmation + Daily EMA20 support.
+✅ <b>TF · Τάση</b>
+<i>Η τάση είναι ξεκάθαρη και στις δύο πιο σημαντικές χρονικές κλίμακες — το γράφημα συμφωνεί με τον εαυτό του.</i>
 
-📰 <b>Τα νέα για αυτό το setup</b>
-• <a href="{url}">"Fed pause"</a> <i>(Reuters)</i> → 🟢 HIGH bullish (dovish reaction, +0.8% εκτιμώμενο)
-• <a href="{url}">"ECB hawkish"</a> <i>(FT)</i> → ⚪ LOW (δεν αλλάζει gold narrative)
-• <a href="{url}">"US CPI miss"</a> <i>(Bloomberg)</i> → 🟡 MED bullish (weaker $ bias)</blockquote>
+✅ <b>RSI · Δύναμη</b>
+<i>Δείκτης δύναμης 58: ούτε υπεραγορασμένο ούτε εξαντλημένο — υπάρχει χώρος για κίνηση.</i>
 
-⏰ ECB 14:00 (σε 2h40')
-🌡️ F&amp;G 72 · ⚡ RISK_ON
+✅ <b>ADR · Καύσιμο</b>
+<i>Διανυθηκε μόνο 56% του ημερήσιου εύρους — υπάρχει καύσιμο για τον στόχο.</i>
+
+✅ <b>News · Ειδήσεις</b>
+<i>CoinDesk (T1): θεσμικά λεφτά αγοράζουν BTC ETF — υποστηρίζει την κίνηση.</i>
+
+✅ <b>Key · Σημείο εισόδου</b>
+<i>Είμαστε στο $75,520 ακριβώς πάνω σε επίπεδο που η τιμή ιστορικά αντιδράει.</i>
+
+<b>💬 Με μια φράση</b>
+Όλα ευθυγραμμισμένα: τάση, χώρος, ειδήσεις, σημείο εισόδου. Κλασικό χαμηλού-ρίσκου setup.
+
+⏰ ECB σε 2h40'  ·  🌡️ F&amp;G 72 · ⚡ RISK_ON
+🩺 💚 Healthy  ·  📡 {ok}/{total} · {N} άρθρα · {pct_t1}% T1
+
+<blockquote expandable>📊 <b>Τεχνική ανάλυση</b>
+TJR Asia Sweep: σάρωσε το $73,346 PDL, BOS πάνω, retest στο $75,520. Volume 1.2× avg, EMA20 4H acting as support.
+
+📰 <b>Νέα που στηρίζουν</b>
+• <a href="{url}">"BTC ETF inflows $420M"</a> <i>(CoinDesk T1)</i> → 🟢 HIGH bullish (institutional demand)
+• <a href="{url}">"Fed dovish tone"</a> <i>(Reuters T1)</i> → 🟢 HIGH bullish (weaker $)
+• <a href="{url}">"Tim Draper bold target"</a> <i>(TheStreet T2)</i> → ⚪ LOW (sentiment only)
+
+📡 <b>Πηγές αυτού του cycle</b>: 9/9 ok · 23 άρθρα · 78% Tier 1
+ForexLive · CoinDesk · Reuters · Investing · Reddit · ZeroHedge · MarketWatch · Cointelegraph · Finnhub</blockquote>
 ```
 
-Επιπλέον για **Tier C** (και μόνο για αυτό το ένα asset που είναι το signal):
-- Αν TRS = 5: πρόσθεσε `--effect fire` στο CLI call.
-- ❌ ΜΗΝ βάλεις mini-summary των άλλων 3 assets στο Tier C. Το Tier C είναι αποκλειστικά για το signal asset.
-- Τα υπόλοιπα 3 assets (non-signal) θα πάνε σε **ΕΝΑ ξεχωριστό Tier A heartbeat** στο τέλος του cycle (βλ. STEP 5.C). Χωρίς επανάληψη, χωρίς noise.
-
-**Πολλαπλά Tier C signals στο ίδιο cycle:** Αν 2+ assets δώσουν ταυτόχρονα Tier C, στείλε **ένα Tier C message ανά asset** (το κάθε ένα αποκλειστικό για το asset του) + **ένα τελικό Tier A** με τα non-signal assets. ΠΟΤΕ μην βάλεις mini-summary μέσα σε Tier C — έτσι σταματάμε το "Άλλα: 3/5, 3/5, 3/5" spam.
+**Κανόνες L4 (ΚΡΙΣΙΜΑ):**
+- **`{POSITION_EXPLAINER_BLOCK}`** = ΥΠΟΧΡΕΩΤΙΚΟ. Generated από:
+  ```bash
+  python GOLD_TACTIC/scripts/position_explainer.py {ASSET} {DIR} {ENTRY} {SL} {TP1} {TP2} {LOT} {BALANCE}
+  ```
+  Παράγει το πλήρες "Ξεκάθαρα νούμερα" block που εξηγεί:
+  - Καθαρό κέρδος σε € σε TP1 και TP2
+  - Μέγιστη απώλεια σε € σε SL
+  - Lot, asset units, notional exposure
+  - Margin (CySEC retail), leverage (1:5/20/30 ανά asset class)
+  - Plain-Greek explanation των R:R, Lot, Leverage
+  - Reminder: "Με 1.000€ κεφάλαιο, μέγιστη απώλεια αυτού του trade είναι X€"
+- **Plain-Greek κάθε criterion** σε `<i>italic</i>` — από την translation table στο 5.0.1. Είναι **υποχρεωτικό** για κάθε ✅ — όχι σύντομες περιγραφές, ολόκληρες φράσεις.
+- "Με μια φράση" κλείσιμο — η ουσία σε <100 χαρακτήρες.
+- Probe (TRS=4) → ίδιο template αλλά:
+  - Title: `🧪 <b>PROBE · BTCUSD</b> · 4/5 ▰▰▰▰▱`
+  - Position explainer: τρέχεις με half-lot (1% risk) → block θα δείξει 10€ max loss
+  - Στο "Γιατί το πήραμε" δείξε **ΚΑΙ** το ❌ criterion με ερμηνεία: `❌ <b>Key</b> — απόσταση μεγαλύτερη του 1% αλλά εντός optimal KZ → δικαιολογεί probe`
+  - Effect: όχι fire (μόνο TRS=5)
+- Confirm (TRS=5 με active probe) → όπως L4 αλλά:
+  - Title: `🔥+ <b>CONFIRM · BTCUSD</b> · 5/5 ▰▰▰▰▰ (scale-in)`
+  - Position explainer: τρέχεις με confirm-lot (1% additional risk) + αναφορά στο combined 2%
+- ❌ **ΜΗΝ** βάλεις mini-summary των άλλων 3 assets. L4 = αποκλειστικά για το signal asset.
+- Πολλαπλά L4 ταυτόχρονα → ένα μήνυμα ανά asset + τελικό L1 PULSE με τα non-signal.
 
 ---
 
@@ -341,23 +649,39 @@ Breakout retest σε $3,245 μετά από καθαρό κλείσιμο πάν
 
 **Πριν** γράψεις οποιοδήποτε tier message, **σκέψου ρητά** για κάθε νέο στο `news_feed.json`:
 
+**Βήμα 0 — Source Tier Awareness (v3 upgrade).**
+Κάθε άρθρο στο `news_feed.json` έχει πλέον πεδίο `tier` (1/2/3) και `weight` (1.5 / 1.0 / 0.5):
+
+| Tier | Πηγές | Weight | Πώς επηρεάζει |
+|------|-------|--------|----------------|
+| **1 — Premium** | Reuters, Bloomberg, ForexLive, CoinDesk, WSJ, FT, CNBC, AP, The Block | ×1.5 | Ένα tier-1 contra-news αρκεί για ❌ News criterion |
+| **2 — Standard** | Yahoo Finance, Investing.com, FOREX.com, MarketWatch, Cointelegraph, Decrypt, FXStreet, KITCO, ZeroHedge, **Reddit-Top** | ×1.0 | Χρειάζονται 2+ συμφωνούντα tier-2 για βαρύτητα |
+| **3 — Other** | blogs, μικρά sites, generic aggregators | ×0.5 | Συνήθως ⚪ LOW εκτός αν επιβεβαιώνεται από tier-1/2 |
+
+**Reddit posts** = social sentiment proxy, ΟΧΙ fundamental news. Tier 2 βαρύτητα μόνο όταν αντικατοπτρίζουν δομημένη ανάλυση. Memes/screenshots → ⚫ NONE.
+
 **Βήμα 1 — Classify impact per asset.**
 Για κάθε νέο, αξιολόγησε επίπτωση σε **ΚΑΘΕΝΑ από τα 4 selected** χωριστά:
 
-| Tier | Emoji | Σημασία |
+| Impact Tier | Emoji | Σημασία |
 |------|-------|---------|
-| HIGH | 🟢 | Άμεσος & ουσιαστικός καταλύτης (bullish/bearish) |
+| HIGH | 🟢 | Άμεσος & ουσιαστικός καταλύτης (bullish/bearish) — απαιτεί τουλάχιστον tier-1 ή 2× tier-2 πηγές |
 | MED | 🟡 | Πλάγια επίπτωση ή μερικός καταλύτης |
-| LOW | ⚪ | Οριακή σχέση |
+| LOW | ⚪ | Οριακή σχέση — ή tier-3 χωρίς confirmation |
 | NONE | ⚫ | Κανένας αντίκτυπος |
 
-**Βήμα 2 — Justify σε 1 φράση.**
-Για **κάθε HIGH ή MED** πρέπει να υπάρχει αιτιολόγηση σε παρένθεση. Παραδείγματα:
-- ✓ `"Fed pause" → 🟢XAU HIGH (dovish → weaker $ → stronger gold)`
-- ✗ `"Fed pause" → 🟢XAU HIGH` ΑΠΑΓΟΡΕΥΕΤΑΙ (χωρίς λογική)
+**Βήμα 2 — Justify σε 1 φράση + cite tier.**
+Για **κάθε HIGH ή MED** πρέπει να υπάρχει αιτιολόγηση σε παρένθεση + αναφορά στην ποιότητα πηγής. Παραδείγματα:
+- ✓ `"Fed pause" (Reuters T1) → 🟢XAU HIGH (dovish → weaker $ → stronger gold)`
+- ✓ `"BTC ETF inflows" (CoinDesk T1) → 🟢BTC HIGH (institutional demand)`
+- ✗ `"Fed pause" → 🟢XAU HIGH` ΑΠΑΓΟΡΕΥΕΤΑΙ (χωρίς λογική και χωρίς tier)
 
 **Βήμα 3 — Συνθετικό verdict για το News criterion.**
-Μάζεψε όλα τα HIGH/MED per asset → αν το net είναι contra στο bias → News criterion = ❌. Αν supportive ή neutral → ✅.
+Άθροισε όλα τα HIGH/MED per asset με τα weights:
+- Αν `Σ(weight × direction) > +0.5` και supportive → News criterion = ✅
+- Αν `Σ(weight × direction) < -0.5` και contra → News criterion = ❌
+- Αλλιώς → ✅ (neutral/μεικτό)
+Πρακτικά: ένα Reuters T1 contra μετράει όσο 3 random blogs.
 
 **Φόρμα στο μήνυμα:**
 - Tier A: δεν εμφανίζεται analysis, μόνο το τελικό ❌/✅ στο News criterion.
@@ -366,10 +690,15 @@ Breakout retest σε $3,245 μετά από καθαρό κλείσιμο πάν
 
 **Αν δεν υπάρχει κανένα HIGH/MED νέο ΣΕ ΑΥΤΟ ΤΟ CYCLE**:
 - Μην στείλεις "Ουδέτερη ροή" χωρίς context.
-- Αντί για αυτό: δείξε τα **τελευταία 2-3 νέα από το `news_feed.json`** με link + source, και γράψε ρητά `"Δεν άλλαξε κάτι από το προηγούμενο cycle — τα νέα παραμένουν ως έχουν"`.
-- Η πηγή (`source`) και το URL (`url`) υπάρχουν ήδη μέσα στο `news_feed.json` ανά άρθρο. Χρησιμοποίησέ τα με `<a href="{url}">"{headline}"</a> <i>({source})</i>`.
+- Αντί για αυτό: δείξε τα **τελευταία 2-3 νέα από το `news_feed.json`** (το feed είναι ήδη ταξινομημένο newest-first within tier) και γράψε ρητά `"Δεν άλλαξε κάτι από το προηγούμενο cycle — τα νέα παραμένουν ως έχουν"`.
+- Format **κάθε** άρθρου (default — time πάνω από link):
+  ```
+  🕐 <i>{age_human} · {published_label}</i>
+  <a href="{url}">"{headline}"</a> <i>({source})</i>
+  ```
+  Τα πεδία `url`, `source`, `age_human`, `published_label` υπάρχουν ήδη μέσα στο `news_feed.json` ανά άρθρο.
 
-**HTML links σε headlines** (υποχρεωτικό σε Tier B/C): Κάθε headline πρέπει να είναι κλικάριμο: `<a href="{url}">"{headline}"</a>`. Τα URLs υπάρχουν στο news_feed.json.
+**HTML links σε headlines** (υποχρεωτικό σε Tier B/C): Κάθε headline πρέπει να είναι κλικάριμο **και να συνοδεύεται από `🕐 {age_human}`** ώστε ο χρήστης να βλέπει σε ένα σκαν πόσο φρέσκο είναι το άρθρο.
 
 ---
 
@@ -401,23 +730,156 @@ Breakout retest σε $3,245 μετά από καθαρό κλείσιμο πάν
 
 ---
 
-### STEP 5.C — Cycle-End Non-Signal Heartbeat (ΜΟΝΟ όταν έχεις στείλει Tier C)
+### STEP 5.C — Companion "Άλλα Assets" Panel (περιφερειακή συνοχή)
 
-**Πότε εφαρμόζεται:** Έστω ότι στο cycle έστειλες 1 ή περισσότερα Tier C messages (ένα ανά signal asset). Για τα υπόλοιπα assets (non-signal), στείλε **ΕΝΑ** τελικό Tier A heartbeat στο τέλος με κεφαλίδα `📡 Υπόλοιπα assets`.
+**Σκοπός:** Όταν η προσοχή του χρήστη είναι **κλειδωμένη** σε ένα asset (open trade ή Tier C signal), τα άλλα 3 selected assets ΔΕΝ πρέπει να ξεχνιούνται. Ο χρήστης πρέπει να βλέπει σε κάθε cycle "πώς πάνε τα άλλα" χωρίς να ξανα-σκρολλάρει το dashboard.
 
-**Κανόνας:** Ένα heartbeat — όχι δύο, όχι mini-summary μέσα σε Tier C. Σκοπός είναι ο χρήστης να έχει ΟΛΑ τα 4 assets σε view χωρίς redundancy.
+#### 5.C.1 — Trigger Matrix
 
-Template (silent, normal Tier A format):
+| Cycle Context | Companion Panel; | Πού εμφανίζεται; |
+|---|---|---|
+| No open trade · No Tier C | ❌ Δεν χρειάζεται | (assets στο κύριο body — current behavior) |
+| **Open trade exists** · No Tier C | ✅ Embedded **μέσα** στο L1/L2 message | Inline section πριν το footer |
+| Tier C signal · No open trade | ✅ Standalone silent message **μετά** το L4 | Ξεχωριστό send |
+| **Open trade + Tier C** στο ίδιο cycle | ✅ Standalone silent message **μετά** το L4 (rich) | Ξεχωριστό send (priority) |
+
+#### 5.C.2 — Companion Panel Template (rich)
+
+Δείχνει **όλα τα non-signal/non-trade assets** που παρακολουθούμε:
+
+```html
+📊 <b>Άλλα assets που παρακολουθώ</b>
+
+🟡 <b>EUR</b> 3/5 · 📈 LONG · <code>1.1839</code> <i>(+0.05%)</i>
+   ✅TF ❌RSI ✅ADR ✅News ❌Key
+   <i>💡 RSI 78 — περιμένουμε pullback πριν entry</i>
+
+🟡 <b>BTC</b> 3/5 · 📈 LONG · <code>$76,420</code> <i>(+0.7%)</i>
+   ✅TF ✅RSI ❌ADR ✅News ❌Key
+   <i>💡 ADR 72% consumed — λίγος χώρος για ξεκίνημα τώρα</i>
+
+⚪ <b>SOL</b> 2/5 · 📈 LONG · <code>$145.20</code> <i>(-0.3%)</i>
+   ❌TF ✅RSI ✅ADR ❌News ❌Key
+   <i>💡 Daily/4H mixed — ακόμα δεν ευθυγραμμίζεται</i>
 ```
-📡 <b>Υπόλοιπα</b> · {HH:MM}
-🟡 EUR 3/5 · 📈 LONG · 60% · (✅TF ❌RSI ✅ADR ✅News ❌Key)
-🟡 BTC 3/5 · 📈 LONG · 60% · (✅TF ✅RSI ❌ADR ✅News ❌Key)
-⚪ SOL 2/5 · 📈 LONG · 40% · (❌TF ✅RSI ✅ADR ❌News ❌Key)
+
+**Ανατομία ανά bullet:**
+1. Color dot + symbol + TRS + direction + price + delta% (since last cycle)
+2. 5 criteria check on inline line
+3. **1 short insight line σε `<i>italic</i>`**: τι λείπει για TRS↑ ή τι παρατηρείται. **Σε απλά Ελληνικά**, όχι jargon.
+
+**Insight conventions** (ώστε ο χρήστης να μαθαίνει patterns):
+- TRS=4 missing 1 criterion → "Λείπει {criterion} — ETA ~{time}"
+- TRS=3 stable → "Παρακολουθώ — δεν έχει αρκετά κριτήρια ακόμα"
+- TRS≤2 → "Setup μη ενεργό — μπορεί να αναβαθμιστεί αργότερα"
+- Strong move (Δp>±1%) → "Μεγάλη κίνηση {direction} — αλλάζει τη δυναμική"
+- Recent news → "Νέα: {1-φράση επίδραση}"
+
+#### 5.C.3 — Embedded Mode (για Tier A/L2 με open trade)
+
+Όταν υπάρχει open trade και τρέχει L1 PULSE ή L2 WATCH cycle:
+
+```
+❄️ <b>{HH:MM}</b> · Trade ενεργό · {SESSION_TAG}
+{SELECTOR_REF_LINE}
+
+[Open trades header από trade_manager.py header — STEP 4.95]
+
+📊 <b>Άλλα 3 assets που παρακολουθώ</b>
+🟡 EUR 3/5 · ... <i>(+0.05%)</i> ✅TF ❌RSI ✅ADR ✅News ❌Key
+   <i>💡 RSI 78 — περιμένουμε pullback</i>
+🟡 BTC 3/5 · ... <i>(+0.7%)</i> ✅TF ✅RSI ❌ADR ✅News ❌Key
+   <i>💡 ADR 72% consumed</i>
+⚪ SOL 2/5 · ... <i>(-0.3%)</i> ❌TF ✅RSI ✅ADR ❌News ❌Key
+   <i>💡 Daily mixed — μη ενεργό</i>
+
+📰 News: ίδια εδώ και {X}'  ·  ⏰ Next: {event} σε {Y}'
+🩺 💚 Healthy  ·  📡 9/9 sources
 ```
 
-- Στέλνεται με `--silent` (no notification — ο χρήστης ήδη ειδοποιήθηκε για τα signals).
-- Αν ΜΟΝΟ 1 asset είναι στο Tier C → 3 non-signal bullets. Αν 2 στο Tier C → 2 non-signal bullets. Κοκ.
-- Αν δεν υπάρχει κανένα Tier C στο cycle → δεν στέλνεις 5.C (σε αυτή την περίπτωση στέλνεις Tier A/B όπως πριν).
+Length budget με embedded companion: **~700 chars** (μεγαλύτερο από plain L1 αλλά justified — υπάρχει trade focus).
+
+#### 5.C.4 — Standalone Mode (μετά από Tier C / L4 SIGNAL)
+
+Στέλνεται **ΑΜΕΣΩΣ** μετά το L4 SIGNAL message (silent, no notification — ο χρήστης ήδη ειδοποιήθηκε):
+
+```
+📊 <b>Υπόλοιπα 3 assets</b> · {HH:MM} · companion μετά το {SIGNAL_ASSET} signal
+🎯 <i>Watched: {SELECTOR_REF}</i>
+
+🟡 <b>EUR</b> 3/5 · 📈 LONG · <code>1.1839</code> <i>(+0.05%)</i>
+   ✅TF ❌RSI ✅ADR ✅News ❌Key
+   <i>💡 RSI 78 — περιμένουμε pullback</i>
+
+[ίδια δομή για 2 ακόμα assets]
+```
+
+Sender:
+```bash
+python GOLD_TACTIC/scripts/telegram_sender.py message "<companion_html>" --silent
+```
+
+#### 5.C.5 — Multiple Tier C Edge Case
+
+Αν 2 assets έδωσαν Tier C ταυτόχρονα → ένα L4 message ανά asset, **ΕΝΑ** companion μετά το τελευταίο L4 με τα υπόλοιπα 2 assets (όχι 1 companion ανά L4).
+
+**Length budget standalone:** ~500-700 chars (3 bullets × ~150 chars).
+
+---
+
+### STEP 5.D — Sources Transparency Footer (ΥΠΟΧΡΕΩΤΙΚΟ σε ΟΛΑ τα tiers)
+
+**Σκοπός:** Ο χρήστης πρέπει σε κάθε Telegram message να μπορεί να δει **ποιες πηγές ελέγχθηκαν** σε αυτόν τον cycle, ποιες πέτυχαν/απέτυχαν, και να **κλικάρει** στο κάθε άρθρο που αναφέρθηκε.
+
+**Πηγή δεδομένων:** Διάβασε το top-level `sources_polled` και `sources_summary` από το `news_feed.json`. Παράδειγμα:
+```json
+"sources_summary": {"total": 8, "ok": 7, "failed": 1, "ok_names": [...], "failed_names": ["Finnhub-general"]},
+"sources_polled": [
+  {"name": "ForexLive", "tier": 1, "ok": true, "items_returned": 15, "error": ""},
+  {"name": "CoinDesk", "tier": 1, "ok": true, "items_returned": 15, "error": ""},
+  {"name": "Reddit-r/Forex", "tier": 2, "ok": true, "items_returned": 1, "error": ""},
+  {"name": "Finnhub-general", "tier": 1, "ok": false, "items_returned": 0, "error": "timeout"}
+]
+```
+
+**Format ανά Tier:**
+
+#### Tier A footer (compact, σε 1 γραμμή — τελευταία γραμμή του message):
+```
+📡 <i>Πηγές: 7/8 ok · {N_articles} άρθρα · T1·T2 mix</i>
+```
+
+#### Tier B footer (expandable blockquote — αμέσως πριν το `⏰` line):
+```html
+<blockquote expandable>📡 <b>Πηγές αυτού του cycle</b> ({ok}/{total} ok · {N_articles} άρθρα)
+✅ ForexLive (T1) · 15 άρθρα
+✅ CoinDesk (T1) · 15 άρθρα
+✅ Reuters via Google (T1) · 3 άρθρα
+✅ Investing.com (T2) · 4 άρθρα
+✅ Reddit r/Forex (T2) · 1 άρθρο
+✅ Reddit r/CryptoCurrency (T2) · 4 άρθρα
+❌ Finnhub-general (T1) · timeout
+Tier mix: T1 18·T2 14·T3 0 ({pct_t1}% premium)</blockquote>
+```
+
+#### Tier C footer (μέσα στο υπάρχον expandable blockquote, μετά το "Πώς επηρέασαν τα νέα" section):
+```html
+📡 <b>Πηγές</b>: ✅ {ok}/{total} (ForexLive·CoinDesk·Reuters·Reddit·Investing) — {N_articles} άρθρα · {pct_t1}% Tier 1
+```
+
+**Συγκέντρωση sources στο footer:** Δείξε τα **top 5 πιο αξιόπιστα** πρώτα (Tier 1 πάντα πρώτα, μετά Tier 2). Group πολλαπλά Google News queries σε ένα entry: `Google News (×{N queries})`. Το ίδιο για Reddit: `Reddit (×{N subs})`.
+
+**Failed sources:** Πάντα δείξε ποιες απέτυχαν (όχι μόνο τις επιτυχημένες) — αν Finnhub-general timeout, ο χρήστης πρέπει να ξέρει ότι λείπει αυτή η οπτική.
+
+**Clickable links + ώρα δημοσίευσης — ΠΑΝΤΟΥ:**
+- **Όλες** οι αναφορές σε άρθρα (σε news section, μέσα σε ΑΛΛΑΓΕΣ, ή σε επεξήγηση signal) πρέπει να έχουν την ώρα **πάνω** από το link:
+  ```
+  🕐 <i>{age_human} · {published_label}</i>
+  <a href="{url}">"{headline}"</a> <i>({source})</i>
+  ```
+- ΑΠΑΓΟΡΕΥΕΤΑΙ να γράψεις πχ "Σύμφωνα με το Reuters..." χωρίς το πραγματικό link **ή** χωρίς timestamp.
+- Το `url`, `age_human`, `published_label` υπάρχουν σε ΚΑΘΕ άρθρο στο `news_feed.json`. Αν ένα άρθρο δεν έχει `url` (κενό string), ΜΗΝ το αναφέρεις στο message.
+- Το feed είναι **pre-sorted** newest-first within tier — εμφάνισέ τα στη σειρά που έρχονται.
 
 ---
 
@@ -435,7 +897,15 @@ Template (silent, normal Tier A format):
    - Lots 1%: `(balance × 0.01) / (sl_points × pip_value)`
    - Pip values: XAUUSD=10$/pip · EURUSD=10$/pip/0.01lot · BTC=1$/point/0.001lot
 8. **HTML escape** — όλα τα dynamic strings με `<`, `>`, `&` πρέπει να escape-άρονται. Το `&` → `&amp;`.
-9. **Message length hard cap** — κάθε tier < 1200 chars. Αν ξεπεράσεις: κόψε πρώτα το Tier C expandable blockquote.
+9. **Message length hard cap** — κάθε tier < 1200 chars (Tier B/C χωρίς το expandable sources blockquote — αυτό δεν μετράει στο visible length γιατί είναι collapsed by default). Αν ξεπεράσεις: κόψε πρώτα τα Tier C non-essential bullets.
+10. **Sources footer** — ΥΠΟΧΡΕΩΤΙΚΟ σε ΟΛΑ τα tiers (A/B/C) — βλ. STEP 5.D. Σύμφωνα με το `sources_polled` του `news_feed.json`. Failed sources πάντα ορατά (όχι μόνο τα ok).
+11. **Article links + timestamp** — κάθε άρθρο που αναφέρεις πρέπει να έχει την ώρα έκδοσης πάνω από το link:
+    ```
+    🕐 <i>{age_human} · {published_label}</i>
+    <a href="{url}">"{headline}"</a> <i>({source})</i>
+    ```
+    Πεδία (`url`, `age_human`, `published_label`) υπάρχουν στο `news_feed.json`. Αν `url` κενό → ΜΗΝ αναφέρεις το άρθρο καθόλου.
+12. **Σειρά εμφάνισης άρθρων** — το `news_feed.json` είναι ήδη ταξινομημένο `(tier weight desc, epoch desc)` (Tier 1 πρώτα, νεότερα πάνω). Σεβάσου τη σειρά.
 
 ---
 
@@ -630,6 +1100,40 @@ python GOLD_TACTIC/scripts/trade_manager.py tick
 
 ---
 
+## STEP 5.9 — Post-Close Reflection (Layer 2 Self-Improvement)
+
+**Πότε εφαρμόζεται:** Όταν το `trade_manager.py tick` (STEP 5.8) έκλεισε **οποιοδήποτε** trade σε αυτό το cycle. Δες το stdout για line `Closed {trade_id} · P/L ...` ή parse-άρε το tick events JSON για events με `type == "tp2"|"sl"|"be"|"max_hold"`.
+
+**Για κάθε trade που έκλεισε**, τρέξε **ΑΜΕΣΩΣ** μετά το tick:
+
+```bash
+python GOLD_TACTIC/scripts/reflection_logger.py post-trade <trade_id>
+```
+
+Αυτό:
+- Διαβάζει το closed trade από `trade_journal.jsonl`
+- Υπολογίζει R-multiple, hold_minutes, attribution_tags
+- Παράγει Greek narrative + lesson_one_liner
+- Append σε `data/trade_reflections.jsonl`
+
+**Fire-and-forget**: ΜΗΝ μπλοκάρεις το cycle αν αποτύχει. Αν exit code != 0, σημείωσέ το στο briefing_log και συνέχισε.
+
+### Lesson στο L6 EXIT message
+
+Το `trade_manager.py` ήδη στέλνει το L6 EXIT reply (🎯🎯 / 💀 / 🛡️ / ⌛). Για να προσθέσεις το lesson από τη reflection σε επόμενο cycle:
+
+```bash
+LESSON=$(python GOLD_TACTIC/scripts/reflection_logger.py latest-lesson)
+# Στείλε follow-up reply στο entry_msg_id:
+python GOLD_TACTIC/scripts/telegram_sender.py message "🧠 <i>Lesson: $LESSON</i>" --reply-to <entry_msg_id> --silent
+```
+
+Αυτό προσθέτει 1-line lesson reply στο thread του closed trade. Silent (χωρίς notification spam).
+
+**Σκοπός:** Κάθε κλειστό trade γίνεται labeled training example για το weekly_audit (STEP δεν τρέχει εδώ — είναι σε Σαββάτου schedule). Συσσωρεύεται γνώση που τροφοδοτεί calibration proposals μετά από 4+ trades.
+
+---
+
 ## STEP 5.10 — 🚀 Launch Protocol (Rocket Scenarios)
 
 **Σκοπός:** Κρατάμε το 4h day-trading discipline (reliable close εντός ημέρας), αλλά μπορούμε να **extend-άρουμε** ένα trade αν εμφανιστεί catalyst που υπερισχύει του χρόνου. Ο "launch" μετατρέπει 2R runner → 3R+, με locked profit και extended timeout.
@@ -699,100 +1203,178 @@ python GOLD_TACTIC/scripts/trade_manager.py open \
 
 ---
 
-## STEP 5.11 — 🔎 Position Check (κάθε cycle με open trades)
+## STEP 5.11 — 💼 Open Trade Status Message (L7 — replaces L1/L2 when trades open)
 
-**Πότε:** Αν υπάρχει 1+ open trade στο `trade_state.json`. Αν δεν υπάρχουν open trades → skip.
+**Πότε:** Αν υπάρχει 1+ open trade στο `trade_state.json`, αυτό το step **αντικαθιστά** το L1 PULSE / L2 WATCH. Στέλνεις **2 ξεχωριστά messages** ανά cycle:
 
-Το `render_header` (STEP 4.95) δίνει compact one-liner per trade. Αυτό το step **συμπληρώνει** με commentary message ανά trade — ο agent γράφει τι βλέπει στο chart + τι σημαίνει για το συγκεκριμένο position.
+- **Message A** (per open trade) — full status + candle analysis + news + κρίση + advice
+- **Message B** (other assets + news matrix) — βλ. STEP 5.12
 
-### Πηγές που διαβάζεις
-- `trade_state.json` για το trade (entry, tp1, tp2, sl, direction, symbol, tp1_hit, launched).
-- `live_prices.json` για current price.
-- `news_feed.json` για νέα που επηρεάζουν το asset.
-- TradingView MCP για quick chart read (optional, μόνο αν χρειαστείς confirmation: `quote_get`, `data_get_study_values` για RSI/MACD — ΠΟΤΕ screenshot).
+Αν δεν υπάρχουν open trades → skip 5.11+5.12, χρησιμοποίησε normal L1/L2/L3/L4.
 
-### Για κάθε open trade, στείλε **reply** στο entry_msg_id με:
+### Message A — Open Trade Status (ΕΝΑ ανά open trade)
+
+Στέλνεται ως **reply στο entry_msg_id** για threading. Length: ~700-900 chars.
 
 ```
-🔎 <b>Position Check · {SYMBOL} {DIR}</b>
-━━━━━━━━━━━━━━━━━━━━━━
-💵 Entry: <code>{entry}</code> · Τώρα: <code>{price}</code> (<b>{pct:+.2f}%</b>)
-🎯 TP1 <code>{tp1}</code> ({tp1_dist:+.2f}%)  ·  🎯 TP2 <code>{tp2}</code> ({tp2_dist:+.2f}%)
-🛡️ SL <code>{sl}</code> ({sl_dist:+.2f}%) {be_note}
-📊 P/L: <b>{pnl_eur:+.2f}€</b> · ⏳ {countdown_to_timeout}
+💼 <b>{SYMBOL} {DIR}</b> @ <code>{entry}</code> → <code>{current}</code> (<b>{pct:+.2f}%</b>)
+P/L: <b>{pnl:+.2f}€</b> · Πρόοδος: {progress_pct}% προς TP1
+🎯 TP1 <code>{tp1}</code> · 🎯🎯 TP2 <code>{tp2}</code> · 🛡️ SL <code>{sl}</code>{be_note}
+⏳ Διάρκεια: {hold_min}min · Max hold σε {timeout_remaining}
 
-<b>💬 Σχόλιο agent</b>
-{commentary_2_3_lines}
+📊 <b>Ανάλυση κεριών</b>
+{candle_analysis_2_lines}
+
+📰 <b>Νέα από last cycle</b>
+{per_news_block}
+
+🎯 <b>Κρίση</b>
+{judgment_2_3_lines}
+
+💡 <b>Συμβουλή: {VERDICT}</b>
+{verdict_explanation_1_line}
 ```
 
-Όπου:
-- `pct`: `(price - entry) / entry × 100` (για LONG, flip για SHORT).
-- `tp1_dist`, `tp2_dist`, `sl_dist`: απόσταση από current price σε % (θετικό = χρειάζεται κίνηση προς TP, αρνητικό = έχεις περάσει).
-- `be_note`: `"(στο Break-Even)"` αν `tp1_hit=true` ώστε να φαίνεται ότι ο SL έχει ανέβει.
-- `commentary_2_3_lines` (ΥΠΟΧΡΕΩΤΙΚΟ — ΔΙΚΗ ΣΟΥ ΑΝΑΛΥΣΗ):
-  - **Πάει καλά** (price moves toward TP): "Κινείται υπέρ μας, RSI {X}, χωρίς αντίσταση άμεσα. Έχει δρόμο."
-  - **Stagnates** (flat near entry): "Πλάγιο ±{X}%, περιμένει catalyst. Αν το 4h κλείσει χωρίς κίνηση → πιθανό max hold close."
-  - **Αδυνατίζει** (moves against): "Τραβάει προς το SL. {level} είναι critical — αν σπάσει → έξοδος από SL."
-  - Σε κάθε περίπτωση: αναφέρεις αν υπάρχει news impact (βλ. STEP 5.12).
+### Πεδία αναλυτικά
 
-### Πολλαπλά open trades
-- Ένα Position Check message **ανά** trade. Όχι συγκεντρωτικό.
-- Πρώτα στέλνεις τα Tier A/B/C του cycle, μετά τα Position Check replies, τέλος το `trade_manager.py tick` (STEP 5.8).
-- `trade_manager.py tick` στέλνει ΜΟΝΟ transitions (TP hit, SL hit, progress milestones, timeout). Το 🔎 Position Check είναι **ανεξάρτητο narrative update**.
+**`be_note`**: `" (στο BE)"` αν `tp1_hit=true` (ο SL έχει ανέβει στο entry).
+
+**`candle_analysis_2_lines`** — 2 γραμμές βάσει quick_scan + price action:
+```
+4ωρο: {trend_observation, π.χ. "bullish continuation, αυξανόμενο volume"}
+1ωρο: {short-term, π.χ. "pullback shallow, holding support"}
+```
+
+**`per_news_block`** — για κάθε νέο που πρωτοεμφανίστηκε από το προηγούμενο cycle (compare με briefing_log last 30 lines):
+
+- Αν υπάρχουν νέα: 1 block ανά νέο (newest-first — ήδη pre-sorted στο feed)
+  ```
+  🕐 <i>{age_human} · {published_label}</i>
+  <a href="{url}">"{headline}"</a> <i>({source} T{tier})</i> → 🟢 SUPPORTIVE / 🟡 MIXED / 🔴 CONTRA
+  {1-line εξήγηση πώς επηρεάζει το direction του trade}
+  ```
+- Αν δεν υπάρχουν νέα νέα:
+  ```
+  Ίδια με προηγούμενο cycle — δεν εμφανίστηκε νέο που να επηρεάζει το {SYMBOL}.
+  ```
+
+**`judgment_2_3_lines`** — 2-3 γραμμές που συνδυάζουν candle analysis + news + structural levels:
+
+Παραδείγματα:
+- ✅ Όλα supportive: "Όλα δείχνουν συνέχιση. Volume αυξάνεται, RSI healthy 62, news supportive (ETF inflows). Είμαστε στη σωστή πλευρά της αγοράς."
+- 🟡 Mixed: "Κίνηση πλάγια. Δεν έχουμε αντίθετο catalyst αλλά ούτε επιπλέον boost. Setup κρατάει — περιμένουμε."
+- 🔴 Concerns: "RSI κάνει bearish divergence στα 1ωρα + news Reuters dovish surprise. Ο 4ωρος candle κλείνει με wick πάνω από entry — sign of weakness."
+
+**`VERDICT`** — υποχρεωτικά μία από τις 3 τιμές + αντίστοιχο χρώμα:
+
+| Verdict | Πότε | Action |
+|---------|------|--------|
+| 🟢 **ΚΡΑΤΑ** | Πάει καλά: aligned news + bullish/bearish-as-expected candles + healthy RSI | Καμία ενέργεια — runner συνεχίζει |
+| 🟡 **ΠΕΡΙΜΕΝΕ** | Ουδέτερο: stagnant ή mixed signals, αλλά δεν υπάρχει immediate threat | Καμία ενέργεια — monitoring continues |
+| 🔴 **ΒΓΕΣ** | Κίνδυνος: HIGH counter-news + adverse candles, OR θέση adverse 2σ από entry | **ΑΥΤΟΜΑΤΟ CLOSE** |
+
+**`verdict_explanation_1_line`** — μία φράση που δικαιολογεί το verdict (π.χ. "ETF flows + 4H bullish structure + RSI 62 — όλα signs to keep").
+
+### ⚡ Auto-close on ΒΓΕΣ verdict
+
+Αν το verdict είναι **🔴 ΒΓΕΣ**, **πριν** στείλεις το Message A:
+
+1. Στείλε το Message A πρώτα (ώστε ο user να βλέπει ΓΙΑΤΙ κλείνει)
+2. **ΑΜΕΣΩΣ** μετά, τρέξε:
+   ```bash
+   python GOLD_TACTIC/scripts/trade_manager.py close {trade_id} advisor_exit
+   ```
+3. Αυτό αυτόματα:
+   - Closes το trade στην τρέχουσα τιμή
+   - Στέλνει 🚪 ADVISOR EXIT reply στο entry message
+   - Updates portfolio (winning/losing trades counter ανάλογα με P/L)
+   - Appends στο `trade_journal.jsonl` με `exit_reason: "advisor_exit"`
+4. Τρέξε `reflection_logger.py post-trade {trade_id}` (STEP 5.9) — σημαντικό για learning
+
+**Κριτήρια για ΒΓΕΣ verdict** (need to satisfy 2+ από τα παρακάτω):
+- HIGH news contra στο direction (p.x. dovish Fed για USDJPY LONG)
+- 4ωρο candle κλείνει με contrary momentum (bearish engulfing για LONG)
+- RSI bearish divergence στα 1ωρα + price σπάει short-term support
+- Adverse excursion >0.6% χωρίς recovery + news contra
+- Major correlation break (DXY moves opposite to your bias forcefully)
+
+**Σπάνια**: ΒΓΕΣ ΧΩΡΙΣ news αν τα candles + structure ξεκάθαρα γυρίζουν. Tο default είναι ΠΕΡΙΜΕΝΕ — πάντα biased to keep την υπόθεση που πήραμε ήδη μέσα από Tier C/L4.
 
 ### Anti-spam guard
-Αν το trade άνοιξε σε αυτό το ίδιο cycle (από STEP 5.7) → **ΔΕΝ στέλνεις** Position Check (το 📥 entry reply είναι αρκετό για πρώτο cycle). Το Position Check ξεκινά από το επόμενο cycle.
+Αν το trade άνοιξε σε αυτό το ίδιο cycle (STEP 5.7) → **ΔΕΝ στέλνεις** Message A — το L4 SIGNAL + 📥 reply είναι αρκετά. Message A ξεκινά από το επόμενο cycle.
 
 ---
 
-## STEP 5.12 — 🚨 News-Catalyst Alert σε Open Trade
+## STEP 5.12 — 📊 Other Assets + News Matrix (L7 Message B)
 
-**Πότε:** Σε κάθε cycle, ΑΦΟΥ έχεις διαβάσει `news_feed.json` και υπάρχει 1+ open trade.
+**Πότε:** Μετά το Message A (5.11), πάντα όταν υπάρχει 1+ open trade. Στέλνεται ως **standalone silent message** (ο user ήδη ειδοποιήθηκε από Message A).
 
-### Λογική
+### Message B — Other Assets + News Impact Matrix
 
-Για κάθε open trade και κάθε νέο που εμφανίστηκε **από το προηγούμενο cycle**:
-
-1. **Classify impact** στο asset του trade (από STEP 5.A): HIGH/MED/LOW/NONE + bullish/bearish.
-2. **Align check**: Το news impact αντιστοιχεί στο direction του trade?
-   - LONG trade + bullish news → 🟢 ευνοϊκό (αν HIGH → ίσως launch opportunity, βλ. STEP 5.10).
-   - LONG trade + bearish news → 🔴 **αντίθετο** → ALERT.
-   - SHORT trade + bearish news → 🟢 ευνοϊκό.
-   - SHORT trade + bullish news → 🔴 **αντίθετο** → ALERT.
-3. **Send alert ΜΟΝΟ για HIGH counter-news** (αλλιώς γίνεται noise).
-
-### Counter-news alert template (reply στο entry_msg_id)
+Length: ~600-800 chars.
 
 ```
-🚨 <b>ΠΡΟΣΟΧΗ · {SYMBOL} {DIR}</b> — Αντίθετο news
-━━━━━━━━━━━━━━━━━━━━━━
-📰 <a href="{url}">"{headline}"</a> <i>({source})</i>
-⚠️ <b>HIGH bearish for LONG</b> — {2-line plain explanation}
+📊 <b>Άλλα assets που παρακολουθώ</b> · {HH:MM}
 
-💡 <b>Πρόταση</b>:
-• Αν P/L ≥ +0.3%: κλείσε ΤΩΡΑ (lock gain)
-• Αν P/L κοντά στο 0: κλείσε break-even, περίμενε reset
-• Αν P/L negative: αν δεν περάσει αμέσως το SL, δες αν υπάρχει 15min reversal — αλλιώς manual close
+[bullet ανά non-trade asset — όπως STEP 5.C.2 companion template]
 
-Τρέξε: <code>python GOLD_TACTIC/scripts/trade_manager.py close {trade_id} news_counter</code>
+🔔 <b>Νέα × 4 Watched</b>
+{news_matrix}
+
+⏰ {next_event_countdown}  ·  🌡️ F&amp;G {fg} · {regime}
+🩺 {data_health_line}
 ```
 
-### Aligned HIGH news (launch candidate)
+### Other Assets bullets (όπως STEP 5.C.2)
 
-Αν το news είναι HIGH bullish για LONG (ή HIGH bearish για SHORT) ΚΑΙ το trade έχει hit TP1 ήδη → προτείνεις launch:
-
+Για **κάθε** από τα 3 (ή 2) non-trade assets:
 ```
-🚀 <b>Launch candidate · {SYMBOL} {DIR}</b>
-📰 <a href="{url}">"{headline}"</a> <i>({source})</i>
-🟢 <b>HIGH aligned news</b> — {explanation}
-
-💡 Αν το TP1 έχει ήδη χτυπηθεί, μπορείς να εκτοξεύσεις σε 3R με SL στο TP1 (profit locked):
-<code>python GOLD_TACTIC/scripts/trade_manager.py launch {trade_id} --reason news --timeout-h 4</code>
+🟡 <b>EUR</b> 3/5 · 📈 LONG · <code>1.18395</code> <i>(+0.05%)</i>
+   ✅TF ❌RSI ✅ADR ✅News ❌Key
+   <i>💡 RSI 78 — περιμένουμε pullback πριν entry</i>
 ```
 
-### Dedup
-- Κράτα σε memory (`data/news_alerts_sent.json`) το `news_id + trade_id` που ήδη alertαρες. Μην ξαναστέλνεις το ίδιο ζεύγος.
-- Το alert στέλνεται **μία φορά ανά νέο ανά trade**.
+### 🔔 News × 4 Watched matrix (NEW — υποχρεωτικό σε Message B)
+
+Συγκεντρωτικός πίνακας στο τέλος. Για **κάθε καινούργιο νέο** που εμφανίστηκε σε αυτό το cycle (newest-first, ήδη pre-sorted στο feed):
+
+```
+🕐 <i>{age_human1} · {published_label1}</i>
+📰 <a href="{url1}">"{headline1}"</a> <i>({source} T{tier})</i>
+   {ASSET1}: 🟢 ↑  {ASSET2}: 🟡 ↔  {ASSET3}: ⚪ —  {ASSET4}: 🔴 ↓
+   <i>1-φράση summary πώς αυτό το νέο επηρεάζει τα 4 assets ξεχωριστά</i>
+
+🕐 <i>{age_human2} · {published_label2}</i>
+📰 <a href="{url2}">"{headline2}"</a> <i>({source} T{tier})</i>
+   {...}
+```
+
+**Codes:**
+- 🟢 ↑ = bullish for this pair (price up expected)
+- 🟡 ↔ = mixed/marginal
+- ⚪ — = irrelevant / no impact
+- 🔴 ↓ = bearish for this pair (price down expected)
+
+**Αν δεν υπάρχουν νέα νέα από το προηγούμενο cycle:**
+```
+🔔 <b>Νέα × 4 Watched</b>: ίδια με προηγούμενο cycle — καμία αλλαγή για κανένα asset.
+```
+
+**Cap:** Max 3 newsletter rows ανά Message B. Αν >3 νέα → keep top-3 by tier+recency, link the rest σε expandable blockquote στο τέλος.
+
+### Length budget
+- Message A: ~700-900 chars (per trade)
+- Message B: ~600-800 chars (1 message regardless of trade count)
+- Both silent EXCEPT αν Message A verdict = ΒΓΕΣ → normal notify
+
+### Coordination με STEP 5.13 launch protocol
+Αν το judgment περιγράφει "aligned HIGH news + post-TP1" κατάσταση → στο Message A προτείνεις launch:
+```
+💡 <b>Συμβουλή: ΚΡΑΤΑ + LAUNCH candidate</b>
+Aligned news (Reuters T1) + TP1 already hit → recommended:
+<code>python trade_manager.py launch {trade_id} --reason news --timeout-h 4</code>
+```
+(Δεν αυτό-εκτελείται — απαιτεί manual confirmation γιατί extends risk profile.)
 
 ---
 
@@ -831,17 +1413,30 @@ Alert: XAUUSD TRS upgrade 3→4
 
 ## STEP 6.7 — Refresh pinned Dashboard (ΠΑΝΤΑ στο τέλος κάθε cycle)
 
-Μετά από STEP 6 (briefing log update), κάνε refresh το pinned dashboard:
+Μετά από STEP 6 (briefing log update), refresh state files και render dashboard:
 
 ```bash
+# Refresh health + embargo state (used by dashboard footer)
+# Note: αν τα έτρεξες ήδη σε STEP 2.7 / 4.85 αυτό απλά τα ενημερώνει — επανάληψη ασφαλής.
+python GOLD_TACTIC/scripts/data_health.py --json > GOLD_TACTIC/data/data_health.json
+python GOLD_TACTIC/scripts/news_embargo.py --json > GOLD_TACTIC/data/embargo_state.json
+
+# Render and push dashboard
 python GOLD_TACTIC/scripts/dashboard_builder.py | python GOLD_TACTIC/scripts/telegram_sender.py dashboard
+
+# CYCLE DONE SIGNAL — append to cycle_log.jsonl audit trail
+python GOLD_TACTIC/scripts/cycle_coordinator.py monitor-done <level> <duration_s> --trades-opened=<N> --trades-closed=<N>
+# π.χ.: ... monitor-done L1 32.4 --trades-opened=0 --trades-closed=0
+# Levels: L1 / L2 / L3 / L4
 ```
 
-Το `dashboard` command κάνει edit το υπάρχον pinned message (αν υπάρχει) ή δημιουργεί νέο & pin (αν δεν υπάρχει). Έτσι το pinned στην κορυφή του chat έχει πάντα:
+Το `dashboard` command κάνει edit το υπάρχον pinned message (αν υπάρχει) ή δημιουργεί νέο & pin (αν δεν υπάρχει). Το pinned dashboard περιλαμβάνει:
 - Τρέχον balance, daily P/L, progress bar
 - Τα 4 watched assets με TRS + 5 criteria (✅/❌)
 - Open trades + next event countdown
 - Sentiment footer (F&G, regime)
+- 🩺 **System Health Line** (T1.3) — Monitor last cycle / Selector last cycle / Data freshness
+- 📅 **Embargo line** (T1.2) — αν υπάρχει active embargo ή upcoming HIGH event <4h
 
 ---
 
@@ -878,8 +1473,14 @@ On **Saturday/Sunday:**
   - Αντί "ALIGNED_BULL" → "και τα 3 γραφήματα (ημέρα/4ωρο/ώρα) δείχνουν άνοδο"
   - Αντί "TRS 4/5" → "4 από 5 κριτήρια πέρασαν"
   - Σε Tier C, πάντα **💬 Με απλά λόγια** section (1-2 γραμμές) που εξηγεί το setup σε κάποιον που δεν ξέρει trading.
-- **News links υποχρεωτικά:** ΠΑΝΤΑ περνάς το headline ως `<a href="{url}">"{headline}"</a>` με αμέσως μετά το source σε italic: `<i>({source})</i>`. Τα URLs υπάρχουν στο `news_feed.json`.
-- **News fallback:** Αν δεν υπάρχουν νέα από το προηγούμενο cycle → γράψε ρητά `"Ίδια με πριν"` ή `"Δεν άλλαξε κάτι"` και δείξε τα τελευταία 2-3 cached news με link+source.
+- **News links + ώρα δημοσίευσης υποχρεωτικά:** ΠΑΝΤΑ έχεις την ώρα **πάνω** από το link (default format):
+  ```
+  🕐 <i>{age_human} · {published_label}</i>
+  <a href="{url}">"{headline}"</a> <i>({source})</i>
+  ```
+  Τα `url`, `age_human` (π.χ. `"15λ πριν"`), `published_label` (π.χ. `"30/04 14:30 EET"`) υπάρχουν σε ΚΑΘΕ άρθρο στο `news_feed.json`. Compact inline format επιτρέπεται μόνο σε tight bullet lists (βλ. STEP 5.0.2 §8).
+- **News fallback:** Αν δεν υπάρχουν νέα από το προηγούμενο cycle → γράψε ρητά `"Ίδια με πριν"` ή `"Δεν άλλαξε κάτι"` και δείξε τα τελευταία 2-3 cached news με link+source+timestamp.
+- **News ordering:** Σεβάσου τη σειρά του `news_feed.json` — είναι ήδη ταξινομημένο `(tier weight desc, epoch desc)`. Newest-first within tier είναι η σωστή σειρά εμφάνισης.
 - **ETA εκτίμηση:** Όταν TRS ≥ 4 → ΠΑΝΤΑ περιλαμβάνεις εκτίμηση χρόνου για 5/5 (βλ. STEP 5.B). Γράφεις ρητά "εκτίμηση μόνο".
 - **Direction + probability:** Σε κάθε tier, δίπλα σε κάθε asset: 📈 LONG ή 📉 SHORT (από selected_assets.direction) και πιθανότητα = TRS × 20% (π.χ. 4/5 → 80%).
 - **Daily trading gates (STEP 4.8):** ΠΡΙΝ διαλέξεις tier, εφάρμοσε τα 4 gates: daily_stop (−40€), max_concurrent (2), kill_zone (optimal/acceptable/off), max_hold (4h). Gate violation → downgrade σε Tier B + εξήγηση.

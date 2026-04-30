@@ -542,6 +542,42 @@ Derivation rules (αν δεν υπάρχει `trs_calculator.estimate_trade_time
 
 ---
 
+## STEP 6.4 — News Impact Matrix (autonomous separate message)
+
+**v3 (30/04/2026):** Μετά από κάθε Selector run (AM/PM/EVE/Weekend), στείλε ξεχωριστό silent message με News Impact Matrix για τα 4 selected assets.
+
+**Πότε:** ~2 λεπτά μετά το main Selector card.
+**Σκοπός:** Πλήρης news context για τη μέρα — ο user βλέπει ολόκληρη τη news landscape με links + per-asset impact + σύνοψη.
+
+### Πλήρες spec
+
+Το format και οι κανόνες είναι **ταυτόσημα με Monitor STEP 5.4** — βλ. `prompts/market_monitor.md` STEP 5.4 για full template (3 variants: Full / Compact / Stale).
+
+**Διαφοροποιήσεις μόνο για Selector context:**
+
+1. **Source pool** — Selector τρέχει σε `--full` mode (10+ πηγές, ~30-40 articles), οπότε το pool για top-5 selection είναι μεγαλύτερο.
+
+2. **Time horizon** — Σε αντίθεση με Monitor (που κοιτάει last 60'), στο Selector run κοιτάς **last 6h** (πρωτεύουσες πηγές που κίνησαν τη μέρα).
+
+3. **🤖 Σύνοψη πρέπει να ευθυγραμμιστεί με τη selection** — αν επέλεξες SOL SHORT + GBPUSD LONG, η σύνοψη πρέπει να εξηγήσει πώς οι ειδήσεις στηρίζουν αυτές τις αποφάσεις.
+
+4. **📌 Conclusion** πρέπει να είναι forward-looking για όλη τη μέρα:
+   - "Bearish crypto narrative + bullish forex setup = κύρια πορεία ημέρας"
+   - "Watch-only mode — η σημερινή news flow δεν στηρίζει επιθετικά setups"
+
+### Send command
+
+```bash
+python GOLD_TACTIC/scripts/telegram_sender.py message "<NEWS_MATRIX_HTML>" --silent
+```
+
+### Skip rules (για Selector)
+
+- Skip αν `news_feed.json` έχει 0 άρθρα (πολύ σπάνιο σε --full mode)
+- Skip αν Variant 3 stale ΚΑΙ ο user έχει ήδη δει stale banner στο main message
+
+---
+
 ## STEP 6.5 — Refresh Pinned Dashboard
 
 Μετά την αποστολή του selection message, refresh state files (health + embargo) και render dashboard:

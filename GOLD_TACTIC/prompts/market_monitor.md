@@ -722,21 +722,72 @@ Selection cascade: **L4 > L3 > L2 > L1**. Μόνο ένα level ανά cycle (π
 
 ---
 
-### L1 — ❄️ PULSE (Heartbeat) · ~280 chars · silent
+### L1 — 👁️ Παρακολούθηση (quiet, v3) · ~550 chars · silent
 
-**Σκοπός:** Group-safe pulse. Ο χρήστης ξέρει ότι το σύστημα ζει χωρίς ειδοποίηση. Ένα tap reveals.
+**Σκοπός:** Quiet cycle — όλα τα 4 ισότιμα, με **ETA per asset** + **news always present** + **skip footer when healthy**.
 
 ```
-❄️ <b>{HH:MM}</b> · Όλα ήρεμα
+👁️ <b>Παρακολούθηση</b> · {HH:MM}  ·  {SESSION_TAG}
 {SELECTOR_REF_LINE}
 
-🟢 XAU 4/5 · 🟡 EUR 3/5 · 🟡 BTC 3/5 · ⚪ SOL 2/5
+📖 <b>Από το προηγούμενο cycle ({PREV_HH:MM})</b>
+{CONTINUITY_NARRATIVE_1_2_LINES}
 
-📰 News: ίδια εδώ και {X}'  ·  ⏰ Next: {event_short} σε {Y}'
-🩺 {DATA_HEALTH_LINE}  ·  📡 {ok}/{total} sources · {N_articles} άρθρα
+📊 <b>Όλα τα 4</b> {QUIET_TAG}
+{ASSET_LINE_1}
+{ASSET_LINE_2}
+{ASSET_LINE_3}
+{ASSET_LINE_4}
+
+📰 {NEWS_SECTION}
+
+🔮 <b>Επόμενες 1-2 ώρες</b>
+🎯 {SYM1}: {ETA_1}
+🎯 {SYM2}: {ETA_2}
+🎯 {SYM3}: {ETA_3}
+🎯 {SYM4}: {ETA_4}
+
+⏰ {NEXT_KZ_OR_EVENT}
+{VERDICT_LINE}
 ```
 
-`{SELECTOR_REF_LINE}` = `cat GOLD_TACTIC/data/selector_ref.txt` — π.χ. `🎯 <i>Watched: <b>AM Selector</b> @08:00 (4h12' ago) — XAU·EUR·BTC·NAS</i>`
+#### Field-fill rules για L1
+
+**`{QUIET_TAG}`**: Αν όλα stable → "(stable)"  · Αν κάτι κουνήθηκε → "(1 κίνηση)" / "(2+ κινήσεις)"
+
+**`{ASSET_LINE_*}`** (1 γραμμή ανά asset, plain Greek):
+```
+🟢 SOL 4/5 · 📉 $83.27 (-0.03% από {prev_HH:MM})
+🟡 BTC 3/5 · 📉 $76,089 (αμετάβλητο)
+⚪ GBPUSD 2/5 · 📈 1.3489 (αμετάβλητο)
+⚪ AUDUSD 2/5 · 📈 0.7132 (+0.01%)
+```
+Color dot rule: 🟢 (TRS≥4) · 🟡 (TRS=3) · ⚪ (TRS≤2)
+
+**`{NEWS_SECTION}`** (ΥΠΟΧΡΕΩΤΙΚΟ — ποτέ κενό):
+- **Νέο νέο < 60'**: `📰 ΝΕΟ πριν {AGE}': "{HEADLINE}" ({SOURCE} T{TIER}) — {1_LINE_GREEK_IMPACT}`
+- **Καμία νέα νέα**: `📰 Δεν εμφανίστηκε νέο τις τελευταίες {N}'. Cached top: "{HEADLINE}" ({SOURCE} T{TIER}, πριν {AGE}) — {VIBE} παραμένει.`
+- **Stale feed**: `📰 Ροή ειδήσεων stale από {HH:MM}. Τελευταίο: "{HEADLINE}".`
+
+**`{ETA_*}`** (ΥΠΟΧΡΕΩΤΙΚΟ — specific time + reason):
+- Examples:
+  - "αναμενόμενη ενεργοποίηση 10:00 (London KZ open)"
+  - "αναμενόμενο 11:00 (4ωρο candle close)"
+  - "αναμενόμενο 15:30 (NY KZ open)"
+  - "αδρανές, επόμενος Selector @15:00"
+
+**`{VERDICT_LINE}`** = output of `python GOLD_TACTIC/scripts/data_health.py --verdict`:
+- HEALTHY → empty (skip footer entirely · κανένα 🩺 line)
+- DEGRADED → "🟡 Σύστημα ενεργό · {label} {N} λεπτά πριν (εντός ορίων, αλλά προσεκτικά)"
+- CRITICAL → "🛑 Σύστημα ΣΕ PAUSE — {N} κρίσιμη πηγή ξεπέρασε το όριο. Δεν θα ανοίξει νέο trade με αυτά τα δεδομένα."
+
+#### Κανόνες L1 v3
+
+- **Skip footer όταν HEALTHY** — αν `data_health --verdict` επιστρέψει empty, ΜΗΝ προσθέσεις `🩺` line
+- **News section ΠΑΝΤΑ παρόν** — διάλεξε ένα από 3 variants (νέο / cached / stale)
+- **🔮 ETA per asset** — όχι μόνο focus, σε ΟΛΑ τα 4
+- **Continuity narrative** από `delta_since_last_cycle.json` (1ο pri) + `briefing_log.md` (2ο pri)
+- **Plain Greek** παντού (✓ τάση αντί ✅TF)
 
 **Κανόνες L1:**
 - Compact 4 assets σε 1 γραμμή (no criteria detail — το dashboard έχει τα πλήρη)
@@ -875,46 +926,84 @@ Single-line summary του τι ισχύει για τα νέα τώρα:
 
 ---
 
-### L3 — 🎯 SETUP (TRS=4 forming) · ~780 chars · normal notify
+### L3 — 🎯 SETUP (TRS=4 forming, v3) · ~900 chars · normal notify
 
-**Σκοπός:** Anticipatory — "ετοιμάσου, σύντομα μπορεί να μπούμε". Ο χρήστης βλέπει WHY 4/5 + WHAT'S MISSING.
+**Σκοπός:** Anticipatory — "ετοιμάσου, σύντομα μπορεί να μπούμε". Πλήρης ανάλυση + verdict line αντί generic footer + 🔮 timeline για άλλα 3 assets.
 
 ```
-🎯 <b>SETUP · BTCUSD</b> · 4/5 σχηματίζεται · {SESSION_TAG}
+🎯 <b>SETUP · {FOCUS_SYM}</b> · 4/5 — ένα βήμα από trigger · {SESSION_TAG}
 {SELECTOR_REF_LINE}
 ━━━━━━━━━━━━━━━━━━━━━━
 
-📈 <b>LONG bias</b> @ <code>$76,420</code>  ·  Strategy: TJR Asia Sweep
+📖 <b>Από το προηγούμενο cycle ({PREV_HH:MM})</b>
+{CONTINUITY_NARRATIVE}
 
-<b>Τι έχουμε (4/5)</b>
-✅ <b>TF</b> — Daily+4H bullish, τάση καθαρή
-✅ <b>RSI</b> — 58 (όχι ακόμα υπεραγορασμένο)
-✅ <b>ADR</b> — 44% remaining (αρκετός χώρος)
-✅ <b>News</b> — CoinDesk T1: ETF inflows υποστηρίζει
-❌ <b>Key</b> — λείπει: τιμή 1.8% πάνω από retest $75,500
+📈/📉 <b>{BIAS} bias</b> @ <code>{PRICE}</code>  ·  Strategy: {STRATEGY}
 
-<b>⏳ Τι περιμένουμε για 5/5</b>
-Pullback στο <code>$75,500</code> για retest → trigger LONG.
-ETA: ~30-90' στο NY KZ (15:30-17:30).
+<b>Τι έχουμε (4/5):</b>
+✅ {CRITERION_MET_1_PLAIN_GREEK}
+✅ {CRITERION_MET_2_PLAIN_GREEK}
+✅ {CRITERION_MET_3_PLAIN_GREEK}
+✅ {CRITERION_MET_4_PLAIN_GREEK}
 
-🟡 EURUSD 3/5  ·  ⚪ AUD 2/5  ·  ⚪ NAS 2/5
+⏳ <b>Λείπει: {MISSING_CRITERION_NAME}</b>
+{MISSING_CRITERION_DETAIL}
 
-⏰ ECB σε 2h40'  ·  🌡️ F&amp;G 72 · ⚡ RISK_ON
-🩺 💚 Healthy
+<b>Τι περιμένουμε για 5/5</b>
+{WHAT_TO_WATCH_DESCRIPTION}
+
+📰 {NEWS_SECTION}
+
+📊 <b>Άλλα 3 assets</b>
+🟡 {SYM2} {TRS2}/5 · {BIAS_EMOJI2} <code>{PRICE2}</code> ({DELTA2})
+⚪ {SYM3} {TRS3}/5 · ⚪ {SYM4} {TRS4}/5
+
+🔮 <b>Επόμενα 30-60 λεπτά</b>
+🎯 {FOCUS_SYM}: αναμενόμενη ενεργοποίηση {HH:MM}-{HH:MM} (αν {trigger_condition}). Αλλιώς: {fallback_HH:MM}.
+🎯 {SYM2}: αναμενόμενο {HH:MM} ({reason})
+🎯 {SYM3}/{SYM4}: σταθερά μέχρι {next_KZ_or_event}
+
+⏰ {NEXT_KZ_OR_EVENT} · <b>{VERDICT_LINE_OR_CONVICTION}</b>
 
 <blockquote expandable>📰 <b>Νέα που στηρίζουν</b>
-• <a href="{url}">"BTC ETF inflows"</a> <i>(CoinDesk T1)</i> → 🟢 HIGH
-• <a href="{url}">"Fed dovish"</a> <i>(Reuters T1)</i> → 🟡 MED bullish
+🕐 <i>{age_human} · {published_label}</i>
+<a href="{url}">"{headline}"</a> <i>({source} T{tier})</i> → 🟢 HIGH
+🕐 <i>{age_human2} · {published_label2}</i>
+<a href="{url2}">"{headline2}"</a> <i>({source2} T{tier2})</i> → 🟡 MED
 
 📡 <b>Πηγές</b> ({ok}/{total} · {N} άρθρα · {pct_t1}% T1)</blockquote>
 ```
 
-**Κανόνες L3:**
-- Πάντα 1 asset focus (το TRS=4 σε optimal KZ) — όχι spread σε 4 assets
-- "Τι έχουμε" + "Τι λείπει" δομή — εκπαιδεύει τον χρήστη
-- ETA estimate (από STEP 5.B logic)
-- Other 3 assets compact at footer
-- Tech analysis σε expandable
+#### Field-fill rules για L3
+
+**`{CRITERION_MET_*_PLAIN_GREEK}`** — ίδια μετάφραση table με L2:
+- TF ✓ → "Τάση: {BULL/BEAR} aligned σε Daily/4H/1H, κατεύθυνση ξεκάθαρη"
+- RSI ✓ → "Ορμή RSI: {N} (όχι ακόμα {extreme_label})"
+- ADR ✓ → "Εύρος ADR: {N}% remaining, αρκετός χώρος για κίνηση"
+- News ✓ → "Νέα: {SOURCE} T{TIER}: {1_LINE_GREEK} υποστηρίζει"
+- Key ✓ → "Επίπεδο: τιμή {N}% από {LEVEL} (close enough για trigger)"
+
+**`{NEWS_SECTION}`** — ΥΠΟΧΡΕΩΤΙΚΟ (όπως L1):
+- Νέο HIGH news < 15': "📰 Νέα HIGH πριν {AGE}': '{HEADLINE}' ({SOURCE} T{TIER}) — υποστηρίζει το {DIRECTION} thesis"
+- Καμία νέα νέα: "📰 Δεν εμφανίστηκε νέο σε αυτόν τον cycle. Cached top υποστηρίζει: '{HEADLINE}' (πριν {AGE})."
+
+**`{VERDICT_LINE_OR_CONVICTION}`**:
+- Αν data healthy + setup mature → "Setup mature, highest conviction σήμερα"
+- Αν data healthy + setup forming → "Setup σχηματίζεται, αναμονή τελευταίου κριτηρίου"
+- Αν data degraded → output of `data_health.py --verdict`
+- Αν data critical → CRITICAL banner (αλλά L3 downgrade σε L2 ούτως ή άλλως)
+
+**🔮 Timeline rules**:
+- Focus asset: specific time window + trigger + fallback
+- Άλλα 3: 1-line ETA με ώρα + λόγο
+- ΟΧΙ vague "~30-90 λεπτά" χωρίς context
+
+#### Κανόνες L3 v3
+
+- Focus σε 1 asset (το TRS=4) αλλά **🔮 ETA για όλα τα 4**
+- Verdict line ή conviction line αντί generic "🩺 Healthy"
+- News section ΠΑΝΤΑ παρόν inline (τα details σε expandable)
+- Plain Greek ✓/⏳ αντί για ✅TF/❌Key
 
 ---
 
@@ -1397,6 +1486,169 @@ Tier mix: T1 18·T2 14·T3 0 ({pct_t1}% premium)</blockquote>
 4. Στο τέλος του cycle (ΠΑΝΤΑ, όχι μόνο όταν έκανες open) τρέξε `trade_manager.py tick` (βλ. STEP 5.8).
 
 **Μην κάνεις manual TP/SL reactions / replies** — το `trade_manager.py tick` τα χειρίζεται αυτόματα (🎯 για TP, 💀 για SL, ⌛ για 4h timeout, ⏱️ για progress milestones).
+
+---
+
+## STEP 5.4 — News Impact Matrix (autonomous separate message)
+
+**v3 (30/04/2026):** Μετά από κάθε L1/L2/L3 message (όχι L4/L5/L6 — αυτά focus στο trade), στείλε ξεχωριστό silent message με News Impact Matrix.
+
+### Πότε στέλνεται
+
+| Cycle outcome | News Matrix; |
+|---|---|
+| L1 Παρακολούθηση (quiet) | ✅ Ναι (compact ή full) |
+| L2 WATCH | ✅ Ναι (compact ή full) |
+| L3 SETUP forming | ✅ Ναι (full με focus στο direction) |
+| L4 SIGNAL (trade fires) | ❌ Όχι — focus στο trade |
+| L5 LIVE tick | ❌ Όχι |
+| L6 EXIT close | ❌ Όχι |
+| L7 Open-trade focus | ❌ Όχι (έχει δικό του news section μέσα) |
+| CRITICAL stale data | ❌ Όχι (Variant 3 stale handled inline) |
+
+### Πώς το γράφεις
+
+1. **Διαβάζεις** `news_feed.json` — ταξινομείς articles by `epoch DESC` (newest first)
+2. **Παίρνεις top-5** με max combined `tier weight × recency`
+3. **Διαλέγεις variant** ανάλογα με τι υπάρχει:
+   - **Full** — αν 1+ άρθρο εμφανίστηκε στις τελευταίες 60'
+   - **Compact** — αν 0 νέα στις τελευταίες 60' (αλλά cached top υπάρχει)
+   - **Stale** — αν `news_feed.json` >30' παλιό
+4. **Στέλνεις** ως silent message, **2 λεπτά μετά** το main message:
+   ```bash
+   python GOLD_TACTIC/scripts/telegram_sender.py message "<NEWS_MATRIX_HTML>" --silent
+   ```
+
+### Variant 1 — Full Matrix (νέο νέο < 60')
+
+```html
+📰 <b>ΡΟΗ ΕΙΔΗΣΕΩΝ</b> · {HH:MM}
+🎯 Watched: {SYM1} · {SYM2} · {SYM3} · {SYM4}
+━━━━━━━━━━━━━━━━━━━━━━
+
+🆕 1) πριν {AGE_HUMAN_1} · <i>{published_label_1}</i>
+"{HEADLINE_1}"
+🔗 <a href="{URL_1}">{URL_1}</a>
+   <i>({SOURCE_1} T{TIER_1} — {tier_label})</i>
+   • {SYM1}: {IMPACT_EMOJI_1A} {IMPACT_LABEL_1A} {direction_1A} — {1_LINE_GREEK_1A}
+   • {SYM2}: {IMPACT_EMOJI_1B} {IMPACT_LABEL_1B} {direction_1B} — {1_LINE_GREEK_1B}
+   • {SYM3}: {IMPACT_EMOJI_1C} {IMPACT_LABEL_1C} {direction_1C} — {1_LINE_GREEK_1C}
+   • {SYM4}: {IMPACT_EMOJI_1D} {IMPACT_LABEL_1D} {direction_1D} — {1_LINE_GREEK_1D}
+
+📍 2) πριν {AGE_HUMAN_2} · <i>{published_label_2}</i>
+"{HEADLINE_2}"
+🔗 <a href="{URL_2}">{URL_2}</a>
+   <i>({SOURCE_2} T{TIER_2})</i>
+   • [4 lines per-asset impact]
+
+📍 3) πριν {AGE_HUMAN_3} · ...
+[same for up to 5 articles total]
+
+━━━━━━━━━━━━━━━━━━━━━━
+🤖 <b>Σύνοψη πάνω στα 4 assets μας</b>
+
+{2_TO_4_PARAGRAPHS_AGENT_NARRATIVE}
+
+📌 <b>Conclusion</b>: {1_LINE_ACTIONABLE}
+
+━━━━━━━━━━━━━━━━━━━━━━
+📊 Ταξινόμηση κατά impact:
+🔴 HIGH ({N_HIGH}): {LIST}
+🟡 MED ({N_MED}): {LIST}
+🟢 LOW ({N_LOW}): {LIST}
+⚪ NONE ({N_NONE}): {LIST}
+
+📡 Πηγές αυτού του cycle: {ok}/{total} ok · {N_articles} άρθρα · {pct_t1}% Tier-1
+```
+
+### Variant 2 — Compact Matrix (καμία νέα < 60')
+
+```html
+📰 <b>ΡΟΗ ΕΙΔΗΣΕΩΝ</b> · {HH:MM} <i>(compact — καμία ροή)</i>
+🎯 Watched: {SYM1} · {SYM2} · {SYM3} · {SYM4}
+━━━━━━━━━━━━━━━━━━━━━━
+
+📭 Δεν εμφανίστηκε νέο τις τελευταίες 60'.
+
+📍 <b>Cached top</b> (πριν {AGE_HUMAN})
+"{HEADLINE}"
+🔗 <a href="{URL}">{URL}</a>
+<i>({SOURCE} T{TIER})</i>
+   • {SYM1}: {IMPACT_EMOJI_A} {IMPACT_LABEL_A} {direction} — {short_greek}
+   • {SYM2}: {IMPACT_EMOJI_B} {IMPACT_LABEL_B} {direction} — {short_greek}
+   • {SYM3}: {IMPACT_EMOJI_C} {IMPACT_LABEL_C} {direction} — {short_greek}
+   • {SYM4}: {IMPACT_EMOJI_D} {IMPACT_LABEL_D} {direction} — {short_greek}
+
+━━━━━━━━━━━━━━━━━━━━━━
+🤖 <b>Σύνοψη</b>
+
+{1_TO_2_PARAGRAPHS_CALM_WINDOW_OBSERVATIONS}
+
+📌 <b>Conclusion</b>: {watch_only_or_continue_thesis}
+```
+
+### Variant 3 — Stale News Matrix (feed > 30' stale)
+
+```html
+📰 <b>ΡΟΗ ΕΙΔΗΣΕΩΝ</b> · {HH:MM} <i>(STALE)</i>
+🎯 Watched: {SYM1} · {SYM2} · {SYM3} · {SYM4}
+━━━━━━━━━━━━━━━━━━━━━━
+
+⚠️ Η ροή ειδήσεων δεν φρεσκαρίστηκε από τις {LAST_UPDATE_HH:MM} (πριν {AGE_HUMAN}).
+Δεν μπορώ να αναλύσω νέα events αυτή τη στιγμή.
+
+📍 <b>Τελευταίο γνωστό</b> (πριν {AGE_HUMAN})
+"{HEADLINE}"
+🔗 <a href="{URL}">{URL}</a>
+<i>({SOURCE} T{TIER})</i>
+   Όλα τα 4 impacts (όπως καταγράφηκαν στις {LAST_UPDATE_HH:MM}):
+   • {SYM1}/{SYM2}: {IMPACT_LABEL}
+   • {SYM3}/{SYM4}: {IMPACT_LABEL}
+
+🤖 <b>Σύνοψη</b>: Με stale news feed, δεν θα ανοίξω νέο trade βάσει νέων. Παρακολουθώ μόνο price action μέχρι να επανέλθει η ροή.
+```
+
+### Field-fill rules
+
+#### Per-asset impact codes (απαραίτητη πλήρης Greek)
+
+| Code | Emoji | Greek label |
+|---|---|---|
+| HIGH | 🔴 | "HIGH" — άμεσος καταλύτης |
+| MED | 🟡 | "MED" — υποστηρικτικό σήμα |
+| LOW | 🟢 | "LOW" — μικρή επίδραση |
+| NONE | ⚪ | "NONE" — καμία επίδραση |
+
+Direction: `bullish` | `bearish` | (omit αν NONE)
+
+Παράδειγμα γραμμής: `• SOL: 🔴 HIGH bearish — correlated, ενισχύει το SHORT thesis μας`
+
+#### Σύνοψη rules (🤖 section)
+
+- **2-4 παράγραφοι** σε plain Greek
+- **Όχι repeat** των bullet points — ο agent πρέπει να **συνδέσει** τα νέα με τα 4 watched assets
+- **Reference** σε ανοιχτό trade αν υπάρχει: "για το SOL που κρατάμε ανοιχτό"
+- **Reference** σε επόμενα events: "θα αξιολογηθεί στο NY KZ 15:30"
+
+#### Conclusion rules (📌)
+
+- 1 line, **actionable**
+- Examples:
+  - "Crypto SHORT setups έχουν solid news backing για το current SOL trade"
+  - "Watch-only mode μέχρι νέο catalyst"
+  - "Forex LONG plan stays intact για NY KZ"
+
+#### Cap στα articles
+
+- Max 5 ανά matrix
+- Selection: top-5 by `(epoch DESC) × (tier weight)` — βλ. ήδη pre-sorted στο `news_feed.json::assets[X].news[]`
+
+#### Skip condition
+
+Αν `news_feed.json` έχει 0 articles total → στείλε mini message:
+```
+📰 <i>Καμία είδηση διαθέσιμη — η ροή είναι κενή αυτόν τον cycle.</i>
+```
 
 ---
 

@@ -36,6 +36,49 @@ python GOLD_TACTIC/scripts/cycle_coordinator.py monitor-start
 
 ---
 
+## STEP 0.5 — Initialize Cycle Context (v7.3 Shared Brain)
+
+**Σκοπός:** Πριν αναλύσεις δεδομένα ή γράψεις μήνυμα, ξέρεις (α) τι είπες πρόσφατα στον χρήστη, (β) σε ποιο regime είμαστε, (γ) τι trace έχει κάθε asset. Χωρίς αυτό, ο agent επαναλαμβάνεται και ακούγεται bot.
+
+```bash
+# Refresh regime (decay logic auto-applied — exit 2 αν label άλλαξε)
+python GOLD_TACTIC/scripts/regime_detector.py detect
+
+# Read brain (compact JSON, <3KB) — ένα read εδώ φέρνει όλα τα δεδομένα memory
+python GOLD_TACTIC/scripts/narrative_writer.py read
+python GOLD_TACTIC/scripts/regime_detector.py current
+```
+
+**Διάβασε από `narrative_memory.json`:**
+- `last_messages[]` — τα τελευταία 3 outbound Tier cards (level, summary, asset_focus, ts). **Αυτά είναι το anti-repetition guard.** Ξέρεις τι ΗΔΗ είπες.
+- `cycles[]` — last 5 cycle summaries (1-2 sentence κάθε ένα). Δίνουν narrative continuity.
+- `narratives_per_asset` — ανά asset: 1-paragraph thread με την εξέλιξη της θέσης (από Selector + προηγούμενοι Monitor cycles).
+- `hypotheses[]` — ανοιχτές υποθέσεις (`condition + then`). Αν η `condition` είναι κοντά στο να ικανοποιηθεί ΤΩΡΑ, αναφέρεις την.
+- `voice_avoid_phrases[]` — banned verbatim phrases (auto-populated από repetition detection σε last 4h messages). **Μην τις γράψεις λέξη-προς-λέξη.**
+
+**Διάβασε από `regime_state.json`:**
+- `regime.label` (`bull` / `bear` / `chop` / `squeeze` / `calm` / `trend_mixed`)
+- `regime.age_hours` + `regime.conviction` (low/med/high)
+- `vix.tier` (`calm` / `normal` / `volatile`) + `fear_greed.label` + `sentiment_dir`
+
+**Output (internal scratch — ΔΕΝ στέλνεται):**
+Γράψε για τον εαυτό σου μια **thesis 2-3 γραμμών** για αυτό το cycle:
+
+```
+THESIS_THIS_CYCLE:
+- Regime: <label> (<age_hours>h, conviction <low|med|high>, VIX <tier>, F&G <label>)
+- Continuation thread: τι από το προηγούμενο cycle/μήνυμα συνεχίζω;
+  (π.χ. "BTC TRS 3→4 πριν 2h, περιμένουμε key level retest")
+- Νέο stake: τι αλλάζει αυτό το cycle vs. προηγούμενο;
+  (αν τίποτα: "καμία ουσιαστική αλλαγή — focus σε narrative continuation")
+```
+
+**Αυτό το thesis είναι ο "compass" σου σε όλο το STEP 5.** Κάθε γραμμή που γράφεις πρέπει να συμφωνεί με τη thesis. Αν αντιφάσκει → ξαναγράψε τη thesis ή σταμάτα και ξαναέλεγξε τα δεδομένα.
+
+**Fallback:** Αν `narrative_memory.json` λείπει ή είναι empty → thesis = "First cycle of session, no prior narrative". Συνέχισε normal flow. Αν `regime_state.json` λείπει → run `regime_detector.py force-reset --label calm` first.
+
+---
+
 ## STEP 1 — Read Selected Assets + Selector Reference
 
 ```
@@ -416,7 +459,32 @@ python GOLD_TACTIC/scripts/trade_manager.py header
 | Neutral regime | 😐 | regime label |
 | Daily stop hit | 🛑 | Halt notice |
 
-**ΚΑΝΟΝΑΣ:** Max 7 emojis ανά visible part. Excess → looks like spam bot. Ομαδικό κανάλι = professional vibe.
+**ΚΑΝΟΝΑΣ EMOJI BUDGET (v7.3 — strict per-Tier quotas):**
+
+| Level | Max emoji στο visible body | Max ανά paragraph |
+|---|---|---|
+| L1 PULSE | 6 | 3 |
+| L2 WATCH | 10 | 4 |
+| L3 SETUP | 12 | 5 |
+| L4 SIGNAL | 15 | 5 |
+| L5 LIVE / L7 status | 8 | 4 |
+
+**Visible body = όλο το μήνυμα ΕΞΩ από `<blockquote expandable>...</blockquote>`.** Μέσα σε expandable επιτρέπονται περισσότερα.
+
+**Banned categories (ΠΟΤΕ μέσα σε Tier card):**
+- Decorative: ✨ 💫 🌟 ⭐ 🎉 🎊 🎈
+- Repetition tells: 💯 🚀 (εκτός από Launch Protocol) 👌 🤝 💪
+- Emoji-as-bullet: bullet points = `•` ή `-`, ΟΧΙ 🔹 🔸 ◾ ◽
+- Emoji-as-divider: dividers = `━━━━━━━━━━━━`, ΟΧΙ ✦ ✧ ◆
+
+**Hierarchy alternative:** πριν προσθέσεις emoji ρώτα: "Μπορώ να εκφράσω την ίδια ιεραρχία με `<b>` ή `<i>`;" Αν ναι → χρησιμοποίησε bold/italic, save το emoji budget.
+
+**Forward narrative emoji 🔮 = exception:** Επιτρέπεται μόνο για το closing forward-narrative line (βλ. 5.0.2.2). Ένα 🔮 ανά Tier card max.
+
+**Self-check (αυτο-υπολογισμός πριν το send):**
+1. Strip `<blockquote expandable>...</blockquote>` block
+2. Count unicode emoji στο visible body
+3. Αν > QUOTA → revise, αφαιρώντας πρώτα decorative emoji
 
 ### 5.0.1 — TRS Criteria Vocabulary + Plain-Greek Translation (NEW)
 
@@ -431,6 +499,137 @@ python GOLD_TACTIC/scripts/trade_manager.py header
 | **Key** Key Level | Within 1% από entry | "Είμαστε ακριβώς στο σημείο που η τιμή ιστορικά αντιδρά — το βέλτιστο σημείο εισόδου με χαμηλό ρίσκο." |
 
 ### 5.0.2 — Cohesion Rules (όλα τα levels)
+
+### 5.0.2.0 — Anti-Repetition Protocol (v7.3, pain #1)
+
+Πριν συντάξεις **οποιαδήποτε γραμμή** στο Tier card:
+
+1. **Διάβασε** `narrative_memory.last_messages[]` (top-3, newest-first). Κάθε entry έχει `{level, summary, asset_focus, ts}`.
+
+2. **Detection rule:** Αν θες να γράψεις φράση που υπάρχει verbatim ή semantically equivalent σε `last_messages[].summary` < 2h:
+   - **Option A — Continuation framing (PREFERRED):** Πρόσθεσε στην αρχή της γραμμής **continuation marker**:
+     - `"Συνεχίζουμε από {Xh}h —"` (ίδιο asset/observation επαναλαμβάνεται)
+     - `"3η φορά σε {N}h που..."` (3+ επανάληψη — γίνεται διδακτικό)
+     - `"Επιστρέφουμε στο {observation} — αυτή τη φορά..."` (αλλάζει context)
+     - `"Σταθερό από πριν {Xh}h: {observation}. Νέο: {what changed}"` (stable αλλά με delta)
+   - **Option B — Skip the line:** Αν δεν προσθέτει νέα πληροφορία, **παράλειψέ την** ολόκληρη.
+
+3. **Voice ban list:** Διάβασε `narrative_memory.voice_avoid_phrases[]`. Αυτές είναι auto-populated phrases που ειπώθηκαν 2+ φορές στις τελευταίες 4h. **Μην τις ξαναγράψεις verbatim.**
+
+4. **News repetition:** Αν headline υπάρχει στο `last_messages[].summary` (από προηγούμενο cycle) **και το ίδιο** στο `news_feed.json` τώρα → ΜΗΝ το ξαναστείλεις. Γράψε αντί `"News stable: ίδια headlines, βλ. προηγούμενο μήνυμα {Xh}h ago"`.
+
+**Edge case — first cycle of session:** `last_messages[]` empty → skip detection, normal flow. Continuation markers ξεκινούν από 2ο cycle.
+
+**Self-check before send:** Trace ότι κάθε γραμμή είτε (α) έχει νέα πληροφορία, είτε (β) έχει continuation marker, είτε (γ) σκοτώθηκε.
+
+---
+
+### 5.0.2.1 — Conviction Vocabulary (v7.3, pain #2)
+
+Generic "περιμένουμε" / "παρακολουθούμε" δίνουν zero conviction. Substitution table (MANDATORY):
+
+| Generic (BAN unless contextualized) | Conviction-loaded replacement |
+|---|---|
+| `περιμένουμε` (alone) | `περιμένουμε <SPECIFIC trigger> μέχρι <SPECIFIC time>` |
+| `αναμονή` (alone) | `holding pattern μέχρι {NY KZ open / event time / RSI exit oversold}` |
+| `παρακολουθούμε` (alone) | `tracking για {specific level / pattern / news reaction}` |
+| `δεν άλλαξε κάτι` | (paraphrase per 5.0.2.0 — δες variants στο 5.A) |
+| `TRS 4/5` (sterile) | `4/5 — ένα βήμα από trigger` ή `4/5 — πιο κοντά από οποτεδήποτε σήμερα` |
+| `TRS 5/5` (sterile) | `5/5 — ενεργοποιείται τώρα` ή `5/5 — όλα ευθυγραμμισμένα, μπαίνουμε` |
+| `RSI 30.2` (number only) | `RSI 30.2 — oversold zone, reversal πιθανότητα ~60% επόμενες 2-4h βάσει similar setups` |
+| `RSI 78` (number only) | `RSI 78 — extreme overbought, mean-reversion bias 4-8h` |
+| `ADR 91% consumed` (number only) | `ADR 91% consumed — minimal room, χρειάζεται ADR reset (next 00:00 GMT) ή spike` |
+
+**Conviction phrases ΥΠΟΧΡΕΩΤΙΚΕΣ (≥1 ανά Tier card L2/L3/L4):**
+
+- **Decisiveness:** "ενεργοποιείται τώρα" · "όλα ευθυγραμμίζονται" · "highest conviction setup σήμερα" · "τρίτο consecutive cycle με aligned criteria"
+- **Anticipation:** "ένα βήμα από" · "πιο κοντά από οποτεδήποτε σήμερα" · "RSI θέλει 2-3 hourly candles ακόμα" · "approaching trigger zone"
+- **Caution:** "βαρύς αντίθετος άνεμος από {source}" · "η αγορά αρνείται να ευθυγραμμιστεί" · "κουρασμένη κίνηση — θέλει break ή reset"
+- **Lessons-from-history:** "3η αποτυχία στο {level} αυτή τη βδομάδα — μισό μέγεθος αν trigger" · "παρόμοιο setup χτύπησε TP2 last Tuesday" · "5 από 7 παρόμοια setups έκλεισαν profitable αυτό το month"
+
+**Recent_lessons integration (MANDATORY όταν `selected_assets[i].recent_lessons` non-empty):**
+
+Από `selected_assets.json::selected[i].recent_lessons[]` (το populate-άρει ο Selector v7.3) διάβασε **όλα** τα lesson strings. Αν >0:
+
+- **L3 SETUP / L4 SIGNAL**: ΥΠΟΧΡΕΩΤΙΚΑ enschedule γραμμή `🧠 <i>{lesson_text}</i>` πριν το position_explainer block. Παραδείγματα:
+  - `🧠 <i>3η αποτυχία στο 1.1485 αυτή τη βδομάδα — μισό μέγεθος, tight SL.</i>`
+  - `🧠 <i>BTC σε όμοια volatility regime: 4 από 6 παρόμοια setups έκλεισαν profitable.</i>`
+- **L2 WATCH**: αν TRS=3 και υπάρχει lesson, footnote: `<i>💡 σημείωση: {lesson}</i>`
+- **L1 PULSE**: skip — too compact
+
+**Hard-banned phrases (auto-populated στο voice_avoid_phrases αν χρησιμοποιηθούν 2+ φορές):**
+- ❌ "Συνεχίζουμε την παρακολούθηση"
+- ❌ "Όλα κανονικά"
+- ❌ "Δεν υπάρχει τίποτα ιδιαίτερο"
+- ❌ "Παρακολουθούμε για επόμενες κινήσεις"
+- ❌ Generic "η αγορά είναι σε wait-and-see mode" χωρίς ποιο event περιμένει
+
+---
+
+### 5.0.2.2 — Forward Narrative (v7.3, mandatory closing line σε L2/L3/L4/L7)
+
+Tier cards κλείνουν χωρίς direction-of-travel — ο user δεν ξέρει τι περιμένει στα επόμενα cycles. Mandatory closing line πριν το footer:
+
+**Format Α — Active scenario (TRS≥3 ή pending event):**
+```
+🔮 <b>Επόμενα 1-3 cycles:</b> {specific scenario} αν {condition}, αλλιώς {alternative}.
+```
+Παραδείγματα:
+- `🔮 <b>Επόμενα 1-3 cycles:</b> RSI exit από oversold αν δούμε hourly close πάνω από 75,800, μετά retest εν αναμονή — αλλιώς continued chop μέχρι NY KZ.`
+- `🔮 <b>Επόμενα 1-3 cycles:</b> NFP σε 45min — αν soft (<150k), expectation USD weakness 0.4-0.8%, EURUSD long trigger στα 1.0890.`
+
+**Format Β — Silent cycle (τίποτα ουσιαστικό αναμενόμενο):**
+```
+🔮 <b>Σιωπηλό cycle:</b> επόμενος decision point: {event/level/time}.
+```
+Παραδείγματα:
+- `🔮 <b>Σιωπηλό cycle:</b> επόμενος decision point: London KZ open σε 1h47'.`
+- `🔮 <b>Σιωπηλό cycle:</b> επόμενος decision point: ECB statement στις 14:45.`
+
+**Format Γ — Multi-asset (2+ assets pending):**
+```
+🔮 <b>Επόμενα cycles:</b>
+• {ASSET1}: {scenario1}
+• {ASSET2}: {scenario2}
+```
+
+**Πού:**
+- L1 PULSE → **skip** (too compact)
+- L2 WATCH → 1 line, **ΥΠΟΧΡΕΩΤΙΚΟ**, πριν το footer
+- L3 SETUP → 1 line, **ΥΠΟΧΡΕΩΤΙΚΟ**, μετά το "Τι περιμένουμε για 5/5", πριν companion section
+- L4 SIGNAL → 1 line, **ΥΠΟΧΡΕΩΤΙΚΟ**, πριν το expandable blockquote (e.g. "Επόμενα 4h: target TP1 αν momentum holds, BE upgrade στο first hit, αλλιώς exit BE/SL αν κάτω από {level}")
+- L7 (open trade) → θέση μετά το judgment + verdict
+
+🔮 = ΤΟ ΜΟΝΟ "decorative" emoji με semantic value. Μη χρησιμοποιείς αλλού.
+
+**Hypothesis tracking:** Αν γράφεις concrete prediction (π.χ. "trigger LONG αν close > 75,500 εντός 4h"), στο STEP 6.95 θα καλέσεις `narrative_writer.py add-hypothesis` ώστε σε επόμενα cycles να την check-άρεις.
+
+---
+
+### 5.0.2.3 — Regime-Aware Tone (v7.3, 6 profiles)
+
+Διάβασε `regime_state.json::regime + vix_tier`. Επίλεξε ένα από 6 tone profiles:
+
+| Regime | calm/normal VIX | volatile VIX |
+|---|---|---|
+| **squeeze / bull / bear (active, conviction ≥ med)** | **DECISIVE** (σύντομες 8-15 λέξεις, action verbs, "καθαρά", "ενεργοποιείται", "τώρα") | **URGENT** (bursts 5-10 λέξεων: "Τώρα. Volume spike. BOS confirmed.") |
+| **calm / chop_young (<48h)** | **MEASURED** (μέτριες 15-25 λέξεις, παρατηρητικός: "παρακολουθούμε για", "σταδιακά", "ώριμα") | **WATCHFUL** (focus 4H, ignore noise: "αυξημένος intraday θόρυβος, εστιαζόμαστε στα 4H") |
+| **chop_old (≥48h chop)** | **CONTRARIAN** ("πίεση συσσωρεύεται", "breakout επικείμενο", "ισχυρότερο όσο μένουμε") | **TENSE** ("Νευρικότητα — tight stops αν trigger, ή skip totally") |
+
+**Auto-selection (γράψε στο cycle scratch πριν το STEP 5):**
+```
+TONE_THIS_CYCLE: <DECISIVE|URGENT|MEASURED|WATCHFUL|CONTRARIAN|TENSE>
+  Reason: regime=<label> · age=<h>h · vix=<tier>
+```
+
+**Apply tone σε:**
+- Opening line phrasing (sentence length, action verbs vs observational)
+- Adverb choice ("τώρα" vs "σταδιακά" vs "συσσωρεύεται")
+- Forward narrative voicing ("μπαίνουμε" vs "παρακολουθούμε" vs "προετοιμαζόμαστε")
+
+---
+
+### 5.0.2.4 — Visual Cohesion Rules (όλα τα levels)
 
 1. **Πρώτη γραμμή = scannable summary** — ο χρήστης πρέπει να ξέρει σε 1.5" τι αφορά το μήνυμα. Format: `{LEVEL_EMOJI} <b>{ACTION}</b> · {DETAIL}`.
 2. **Bold μόνο για ιεραρχία** — τίτλος, key numbers, criterion labels. ΠΟΤΕ ολόκληρες προτάσεις σε bold (γίνεται κουραστικό στο mobile).
@@ -645,6 +844,58 @@ ForexLive · CoinDesk · Reuters · Investing · Reddit · ZeroHedge · MarketWa
 
 ---
 
+### STEP 5.E — Voice Quality Self-Check (v7.3, MANDATORY before send)
+
+**Πριν** stage το Tier card στο `telegram_sender.py`, **trace** σε αυτή τη checklist. Αν fail σε οποιοδήποτε, **revise**.
+
+#### Checklist (count, don't approximate)
+
+| # | Check | Pass criterion |
+|---|---|---|
+| **C1** | Emoji budget | `emoji_count(visible_body) ≤ QUOTA[level]` (βλ. 5.0 emoji table) |
+| **C2** | Conviction phrase | ≥1 conviction phrase from 5.0.2.1 vocabulary |
+| **C3** | Forward narrative | 1 line starts με `🔮 <b>Επόμενα` ή `🔮 <b>Σιωπηλό` (L2/L3/L4/L7 only) |
+| **C4** | News causality | Κάθε news headline έχει 4-part causal chain (5.A Βήμα 2) |
+| **C5** | Banned phrases | Zero matches σε 5.0.2.1 hard-banned list |
+| **C6** | Verbatim repetition | Zero exact match με `last_messages[].summary` paragraphs < 2h |
+| **C7** | Voice avoid list | Zero matches σε `narrative_memory.voice_avoid_phrases[]` |
+| **C8** | Continuation marker | Αν >1 paragraph για ίδιο asset/observation σε <2h cycles → continuation marker present |
+| **C9** | Recent lessons | Αν `recent_lessons[]` non-empty για featured asset → 🧠 line εμφανίζεται σε L3/L4 |
+| **C10** | Regime tone match | Sentence style matches selected tone (από 5.0.2.3) |
+
+#### Failure handling
+
+- **C1 fail (over budget):** Strip 1 emoji at a time από least-functional positions (decorative first). Re-count.
+- **C2 fail (no conviction):** Insert 1 conviction phrase από 5.0.2.1 table στο position της κύριας thesis γραμμής.
+- **C3 fail (no forward):** Append `🔮 <b>Επόμενα 1-3 cycles:</b> ...` πριν το footer.
+- **C4 fail (no causality):** Είτε προσθέσε 4-part chain, είτε αφαίρεσε το news headline εντελώς.
+- **C5/C7 fail (banned phrase):** Substitute με conviction-loaded equivalent.
+- **C6/C8 fail (repetition):** Add continuation marker ή delete the duplicate paragraph.
+- **C9 fail:** Insert 🧠 line.
+- **C10 fail:** Restructure 1-2 sentences για tone match.
+
+**Cap:** Max 2 revision passes ανά cycle. Αν μετά 2 revisions ακόμα fails → send με log warning στο `briefing_log.md` (`⚠️ Voice check failed C{X} after 2 retries`). Δεν αναβάλλεις το cycle.
+
+#### Implementation note
+
+Αυτό είναι **prompt-level self-introspection**, όχι deterministic script. Γράψε στο cycle scratch:
+
+```
+VOICE_CHECK:
+  C1 emoji_count = N (quota = M) → PASS/FAIL
+  C2 conviction = "{phrase found}" → PASS/FAIL
+  C3 forward = "{line found}" → PASS/FAIL
+  C4 causality = "{N/M chains complete}" → PASS/FAIL
+  C5..C10 → PASS/FAIL
+  Verdict: APPROVED | REVISE_LOOP_1 | REVISE_LOOP_2 | SEND_WITH_WARNING
+```
+
+Μετά το APPROVED verdict → call `telegram_sender.py message`.
+
+**Logging:** Στο STEP 6.95 θα γραφτεί `voice_quality_check` event στο `cycle_log.jsonl` με `status=ok|warn` + `fail_codes=[...]`.
+
+---
+
 ### STEP 5.A — News Reasoning Protocol (ΥΠΟΧΡΕΩΤΙΚΟ)
 
 **Πριν** γράψεις οποιοδήποτε tier message, **σκέψου ρητά** για κάθε νέο στο `news_feed.json`:
@@ -670,11 +921,62 @@ ForexLive · CoinDesk · Reuters · Investing · Reddit · ZeroHedge · MarketWa
 | LOW | ⚪ | Οριακή σχέση — ή tier-3 χωρίς confirmation |
 | NONE | ⚫ | Κανένας αντίκτυπος |
 
-**Βήμα 2 — Justify σε 1 φράση + cite tier.**
-Για **κάθε HIGH ή MED** πρέπει να υπάρχει αιτιολόγηση σε παρένθεση + αναφορά στην ποιότητα πηγής. Παραδείγματα:
-- ✓ `"Fed pause" (Reuters T1) → 🟢XAU HIGH (dovish → weaker $ → stronger gold)`
-- ✓ `"BTC ETF inflows" (CoinDesk T1) → 🟢BTC HIGH (institutional demand)`
-- ✗ `"Fed pause" → 🟢XAU HIGH` ΑΠΑΓΟΡΕΥΕΤΑΙ (χωρίς λογική και χωρίς tier)
+**Βήμα 2 — Causal Chain ΥΠΟΧΡΕΩΤΙΚΟ (v7.3, pain #3).**
+
+Κάθε νέο που αναφέρεις σε Tier B/C/L4 ΠΡΕΠΕΙ να ακολουθεί **4-part causal format**:
+
+```
+{headline} ({source} T{tier}) → {tier_emoji} {ASSET} {impact_level}
+({macro mechanism} → {market mechanism} → {asset-specific reaction με quantification} → {bias for our position})
+```
+
+**3 reference examples:**
+
+1. **Macro event:**
+   ```
+   "Fed dovish surprise — 25bp cut expected, no cut delivered" (Reuters T1)
+   → 🟢 XAUUSD HIGH
+   (dovish hold → $DXY ↓ ~0.4-0.8% σε επόμενες 24h → XAU benefits από weaker $ ~+0.4-0.8% per 0.5% $ decline → tailwind για LONG bias)
+   ```
+
+2. **Sector-specific:**
+   ```
+   "BTC ETF inflows $420M one-day record" (CoinDesk T1)
+   → 🟢 BTC HIGH
+   (institutional demand → spot pressure ↑ → ETF arbitrage rebalance buys spot → +1-2% short-term price impact → reinforces LONG thesis)
+   ```
+
+3. **Geopolitical:**
+   ```
+   "Hormuz standoff lifts oil 3.2%" (CoinDesk T1)
+   → 🟡 SOL MED
+   (oil ↑ → risk-off rotation → crypto correlation με risk assets → SOL συνήθως selloff -0.8% / 1% oil spike → minor headwind για LONG, supports SELL bias)
+   ```
+
+**MANDATORY 4-part components:**
+1. **Macro mechanism** — τι έκανε αυτή η είδηση στο macro level (DXY, rates, risk sentiment, oil)
+2. **Market mechanism** — πώς αυτό μεταφράζεται σε flows / positioning
+3. **Asset-specific reaction** — τι κάνει αυτό το asset typically (με quantification όπου δυνατόν: "+0.4-0.8%", "-1.2%")
+4. **Bias for our position** — υπέρ ή κατά της κατεύθυνσής μας (`tailwind για LONG` / `headwind για SELL` / `neutralizing factor`)
+
+**Banned format:**
+- ❌ `"Fed dovish" (Reuters T1) → 🟢 XAU HIGH` — no causal chain
+- ❌ `"BTC slide" (CoinDesk T1) → HIGH (SOL declining, supports SELL)` — missing macro/market mechanism, no quantification
+- ❌ `"French CPI picks up" (ForexLive T1) → MED` — zero causal chain
+
+**Approval gate:** Αν δεν μπορείς να γράψεις **και τα 4** parts για ένα νέο, **μην το αναφέρεις καθόλου**. Σιγή > κενή reference.
+
+**Quantification reference table** (use approximate elasticity όπου δυνατόν):
+
+| Driver | Reaction | Approximate elasticity |
+|---|---|---|
+| DXY → XAU | inverse | 1% $ move ≈ -0.6% to -1.0% gold |
+| DXY → EUR | near-inverse | 1% $ move ≈ -0.85% EURUSD |
+| VIX shock → BTC | risk-off | VIX +5pts ≈ BTC -1.5% to -3% short-term |
+| 10Y yield → NAS | rate-sensitive | +10bp yield ≈ -0.4% NAS |
+| Oil → risk assets | risk-off catalyst | 1% oil ≈ -0.3% to -0.6% crypto/equities |
+
+Αν δεν έχεις calibrated elasticity, χρησιμοποίησε **directional only** ("tailwind", "headwind", "neutral") **με ρητή `direction reason`** — όχι κενή reference.
 
 **Βήμα 3 — Συνθετικό verdict για το News criterion.**
 Άθροισε όλα τα HIGH/MED per asset με τα weights:
@@ -690,7 +992,13 @@ ForexLive · CoinDesk · Reuters · Investing · Reddit · ZeroHedge · MarketWa
 
 **Αν δεν υπάρχει κανένα HIGH/MED νέο ΣΕ ΑΥΤΟ ΤΟ CYCLE**:
 - Μην στείλεις "Ουδέτερη ροή" χωρίς context.
-- Αντί για αυτό: δείξε τα **τελευταία 2-3 νέα από το `news_feed.json`** (το feed είναι ήδη ταξινομημένο newest-first within tier) και γράψε ρητά `"Δεν άλλαξε κάτι από το προηγούμενο cycle — τα νέα παραμένουν ως έχουν"`.
+- Δείξε τα **τελευταία 2-3 νέα από το `news_feed.json`** (το feed είναι ήδη ταξινομημένο newest-first within tier).
+- **Anti-repetition (v7.3):** Η ακριβής φράση `"Δεν άλλαξε κάτι από το προηγούμενο cycle"` ΕΧΕΙ ΑΠΑΓΟΡΕΥΘΕΙ verbatim (πάει στο `voice_avoid_phrases`). Επίλεξε **ένα από τα παρακάτω variants** βάσει context:
+  - `"Sticky news context — τίποτα νέο εδώ και {Xh}, focus σε technical."`
+  - `"News flat για {Xh}, οπότε η κίνηση είναι technical, όχι catalyst-driven."`
+  - `"Καμία νέα είδηση που να αλλάζει τη θέση μας από {time of last narrative shift}."`
+  - `"{Xh} χωρίς fresh catalyst — ο μόνος drift είναι ο natural drift των rates/positioning."`
+  - `"Sticky από πριν {Xh}: {brief technical observation}. Catalyst απαιτείται για επόμενο move."`
 - Format **κάθε** άρθρου (default — time πάνω από link):
   ```
   🕐 <i>{age_human} · {published_label}</i>
@@ -1443,6 +1751,105 @@ Alert: XAUUSD TRS upgrade 3→4
 ```
 
 **Cycle number:** Count entries in today's log + 1.
+
+---
+
+## STEP 6.95 — Update Narrative Memory (v7.3 Shared Brain)
+
+**Σκοπός:** Καταγράφεις τι έγινε σε αυτό το cycle ώστε ο επόμενος Monitor (σε 20-40min) να ξέρει τι είπες ΚΑΙ τι παρακολουθούμε. Χωρίς αυτό, anti-repetition (5.0.2.0) και continuation framing δεν λειτουργούν.
+
+Εκτελείται **μετά** το επιτυχές Telegram send (έχεις `tier_msg_id`), και **πριν** το STEP 6.7 dashboard refresh.
+
+### 6.95.1 — Append cycle summary (ΥΠΟΧΡΕΩΤΙΚΟ)
+
+```bash
+python GOLD_TACTIC/scripts/narrative_writer.py append-cycle \
+  --schedule "<GT_Monitor_Peak|GT_Monitor_OffPeak|GT_Monitor_Night|GT_Monitor_WE>" \
+  --trs-json '{"XAU":4,"EUR":3,"BTC":3,"SOL":2}' \
+  --note "<2-3 line tldr του τι ειπώθηκε στο card>"
+```
+
+Παραδείγματα `--note`:
+- `"BTC 4/5 σε optimal KZ, λείπει retest. ETA 30-90min στο NY KZ. Forward: trigger LONG αν close πάνω από 75,500."`
+- `"L1 calm pulse — όλα 3/5, καμία αλλαγή vs. πριν 1h. Επόμενος decision point: ECB σε 2h40."`
+
+### 6.95.2 — Log message text (ΥΠΟΧΡΕΩΤΙΚΟ)
+
+```bash
+python GOLD_TACTIC/scripts/narrative_writer.py log-message \
+  --tier-msg-id <tier_msg_id> \
+  --level <L1|L2|L3|L4|L7> \
+  --text-file GOLD_TACTIC/data/tg_msg_staging.txt \
+  --asset-focus "<comma-separated symbols σε αυτό το card, π.χ. BTC,XAU>" \
+  --schedule "<schedule_name>"
+```
+
+(Ο writer auto-summarize-άρει στις πρώτες 220 chars + κρατάει last 3 messages.)
+
+### 6.95.3 — Update per-asset narrative thread (ΥΠΟ συνθήκη)
+
+**Πότε:** Αν αυτό το cycle πρόσθεσε σημαντική εξέλιξη σε ένα asset narrative:
+- TRS bucket flip (3↔4 ή 4↔5)
+- Νέο significant news catalyst (HIGH impact με causality στο asset)
+- Trade opened/closed σε αυτό το asset
+- Regime shift για αυτό το asset (από WAITING → ACTIVE κλπ.)
+
+```bash
+python GOLD_TACTIC/scripts/narrative_writer.py update-narrative \
+  --asset <SYMBOL> \
+  --thread-append "<1-line description of evolution>" \
+  --schedule "<schedule_name>"
+```
+
+Παραδείγματα `--thread-append`:
+- `"BTC TRS 3→4 at NY KZ open, missing only retest 75,500"`
+- `"EUR TRS dropped 4→3 after NFP USD strength surprise"`
+- `"XAU trade closed +0.8R, runner held to TP2"`
+
+**Skip rule:** Αν L1 PULSE με zero ουσιαστική αλλαγή → **skip 6.95.3** (μόνο 6.95.1 + 6.95.2).
+
+### 6.95.4 — Add hypothesis (ΥΠΟ συνθήκη)
+
+**Πότε:** Αν στο Tier card έγραψες forward-narrative με concrete prediction (π.χ. `🔮 Επόμενα 1-3 cycles: trigger LONG αν close > 75,500 εντός 4h, αλλιώς continued chop`), **καταχώρησε** την υπόθεση:
+
+```bash
+python GOLD_TACTIC/scripts/narrative_writer.py add-hypothesis \
+  --asset <SYMBOL> \
+  --condition "<exact testable condition, π.χ. 'BTC close > 75,500 within 4h'>" \
+  --then "<expected outcome, π.χ. 'TRS jumps to 5, LONG entry triggers'>" \
+  --expires-h <integer hours, default 6>
+```
+
+Σε επόμενα cycles, ο STEP 0.5 θα τις διαβάσει από `narrative_memory.hypotheses[]`. Expired hypotheses auto-pruned.
+
+### 6.95.5 — Refresh voice avoid phrases (ΥΠΟΧΡΕΩΤΙΚΟ)
+
+```bash
+python GOLD_TACTIC/scripts/narrative_writer.py refresh-avoid-phrases --window-hours 4 --min-occurrences 2
+```
+
+Deterministic n-gram detection σε last 4h messages. Αν φράση εμφανίστηκε ≥2× verbatim → προστίθεται στο `voice_avoid_phrases[]`. Ο επόμενος Monitor cycle θα την δει στο STEP 0.5 και θα αποφύγει verbatim repeat.
+
+### 6.95.6 — Voice quality check log (ΥΠΟΧΡΕΩΤΙΚΟ)
+
+Logger event για το STEP 5.E self-check verdict:
+
+```bash
+# Αν STEP 5.E βγήκε APPROVED στο πρώτο pass:
+python -c "
+import json, sys, datetime, pathlib
+log = pathlib.Path('GOLD_TACTIC/data/cycle_log.jsonl')
+ts = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=3))).isoformat(timespec='seconds')
+rec = {'ts': ts, 'schedule': '<schedule_name>', 'type': 'voice_quality_check', 'status': 'ok', 'fail_codes': []}
+with log.open('a', encoding='utf-8') as f: f.write(json.dumps(rec, ensure_ascii=False) + '\n')
+"
+```
+
+Αν 2 retries δεν έλυσαν fails → `'status':'warn'`, `'fail_codes':['C{X}']`.
+
+### Fail handling
+
+Αν `narrative_writer.py` αποτύχει σε κάποιο command → log to briefing_log και continue. **ΜΗΝ μπλοκάρεις το cycle.** Brain degradation > zero brain. (Επόμενος cycle θα ξαναδοκιμάσει.)
 
 ---
 

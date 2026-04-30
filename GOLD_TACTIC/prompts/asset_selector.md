@@ -67,6 +67,46 @@ python GOLD_TACTIC/scripts/session_check.py > GOLD_TACTIC/data/session_now.json
 
 ---
 
+## STEP 2.5 — Read Brain State (v7.3 Shared Brain)
+
+Διάβασε το cross-cycle "brain" — τι παρατήρησε το προηγούμενο 24h, σε ποιο regime είμαστε, ποιες υποθέσεις είναι ακόμα ανοιχτές. Επηρεάζει το scoring σου στο STEP 4 + το `narrative_seed` που θα γράψεις στο STEP 5.
+
+```bash
+# Refresh regime state (decay logic auto-applied)
+python GOLD_TACTIC/scripts/regime_detector.py detect
+
+# Read brain (compact JSON, <3KB)
+python GOLD_TACTIC/scripts/narrative_writer.py read
+```
+
+**Από `regime_state.json`:**
+- `regime.label` — `bull` / `bear` / `chop` / `squeeze` / `calm` / `trend_mixed`
+- `regime.age_hours` + `regime.conviction` (low/med/high)
+- `vix.tier` — `calm` / `normal` / `volatile`
+- `fear_greed.label` + `sentiment_dir`
+
+**Score adjustments βάσει regime (πέρα από το STEP 4):**
+
+| Συνθήκη regime | Adjustment | Reasoning |
+|---|---|---|
+| `regime == squeeze` & conviction ≥ med | **+1** για breakout/trend strategies | Compression → expansion expected |
+| `regime == chop` & age_hours ≥ 48 | **+1** για mean-reversion / range strategies | Long chop favors range trades |
+| `vix.tier == volatile` | **−1** για illiquid assets (SOL, XRP, ETH) | High vol punishes thin books |
+| `vix.tier == volatile` | **+1** για majors (XAUUSD, EURUSD, GBPUSD) | Vol opportunities, deep liquidity |
+| `regime in (bull, bear)` & conviction high | **+1** για aligned-direction setups | Trend conviction reward |
+
+**Από `narrative_memory.json`:**
+- `narratives_per_asset[symbol]` — open thesis ανά asset (1-paragraph thread). Αν υπάρχει thread για ένα asset → ξέρεις ότι το έχουμε ενεργό watch.
+- `hypotheses[]` — αν υπάρχει active hypothesis για ένα asset (`condition + then`), δώσε προτεραιότητα όταν η `condition` είναι σχεδόν να ικανοποιηθεί.
+- `cycles[]` — last 5 cycle notes σου δίνουν ροή για το τι παρακολουθούμε.
+
+**Document the regime adjustment** στο `selected[].reasons[]` array (νέο πεδίο, see STEP 5):
+- π.χ. `"+1 from regime: squeeze + bullish setup"` ή `"+1 from regime: long chop favors mean-reversion"`
+
+**Fallback:** Αν `narrative_memory.json` λείπει → treat empty (no adjustments). Αν `regime_state.json` λείπει → run `regime_detector.py force-reset --label calm` first.
+
+---
+
 ## STEP 3 — Determine Run Type
 
 Check current time (EET):
@@ -139,11 +179,12 @@ python GOLD_TACTIC/scripts/reflection_logger.py recent --symbol <SYM> --limit 3
 
 Αν όλα τα top 4 βγαίνουν `monitoring_only` ή `blocked` → καθαρό σήμα "extreme market day, full pause" — αλλά συνεχίζεις να βλέπεις live data.
 
-Write `GOLD_TACTIC/data/selected_assets.json`:
+Write `GOLD_TACTIC/data/selected_assets.json` (**schema v2 — v7.3 brain-aware**):
 ```json
 {
   "timestamp": "<ISO 8601 EET>",
   "selector_run": "morning|afternoon|evening|weekend",
+  "schema_version": "v2",
   "selected": [
     {
       "symbol": "XAUUSD",
@@ -151,6 +192,18 @@ Write `GOLD_TACTIC/data/selected_assets.json`:
       "status": "tradeable",
       "direction_bias": "BUY",
       "reason": "Trend bull, Fed dovish signals, ADR 45%",
+      "reasons": [
+        "Daily+4H+1H aligned BULL",
+        "Fed dovish surprise — DXY pressure ongoing",
+        "ADR 45% — full room available",
+        "Key level 3260 retest possible at NY KZ",
+        "+1 from regime: trend_up conviction high"
+      ],
+      "recent_lessons": [
+        "Last 7d: 2 από 3 setups στο 3260 zone hit TP2 (clean breakouts)",
+        "Σε post-FOMC χρειάζεται 30-45min settle πριν entry"
+      ],
+      "narrative_seed": "Gold benefits from sustained DXY weakness post-Fed; expect retest of 3260 within 24h, breakout target 3290.",
       "strategy": "Breakout / Trend Following",
       "key_level": 3260,
       "what_to_watch": "Break above 3260 for long entry"
@@ -162,6 +215,12 @@ Write `GOLD_TACTIC/data/selected_assets.json`:
       "block_reason": "ADR consumed 102% — post-CPI extreme move",
       "direction_bias": "SELL",
       "reason": "Bearish alignment but ADR exhausted — watch for tomorrow",
+      "reasons": [
+        "Bearish 4H+1H alignment",
+        "ADR exhausted (102%) — watch only"
+      ],
+      "recent_lessons": [],
+      "narrative_seed": "EURUSD frozen by ADR exhaustion; awaiting reset for fresh entry near 1.0850.",
       "strategy": "Pullback / Wait",
       "key_level": 1.0850,
       "what_to_watch": "Watch only — no entry until ADR resets"
@@ -173,6 +232,9 @@ Write `GOLD_TACTIC/data/selected_assets.json`:
       "block_reason": "ADR consumed 145% — extreme volatility, capital protection",
       "direction_bias": "—",
       "reason": "—",
+      "reasons": ["ADR 145% — auto-block (>120%)"],
+      "recent_lessons": [],
+      "narrative_seed": "BTC sidelined — extreme post-FOMC chop, waiting for fresh range to form.",
       "strategy": "—",
       "key_level": null,
       "what_to_watch": "Wait for normalcy"
@@ -185,11 +247,15 @@ Write `GOLD_TACTIC/data/selected_assets.json`:
 }
 ```
 
-**Schema notes:**
+**Schema notes (v2):**
 - `status` πεδίο **υποχρεωτικό** σε κάθε `selected[]` entry
 - `block_reason` υποχρεωτικό όταν `status != "tradeable"`, αλλιώς απουσιάζει
 - Παλιό πεδίο `dropped` έγινε `excluded_below_top4` — αυτά είναι τα assets που **δεν** μπήκαν στα top-4 (χαμηλότερο score)
 - Τα `monitoring_only` / `blocked` ΕΙΝΑΙ μέσα στα `selected` (top-4), όχι στα excluded
+- **`reasons[]` (NEW v2)** — 3-5 strings explaining γιατί αυτό το asset επιλέχθηκε. Ο Monitor τα διαβάζει για context σε κάθε Tier card. Συμπερίλαβε regime adjustments (από STEP 2.5) ως ξεχωριστή entry.
+- **`recent_lessons[]` (NEW v2)** — 1-3 lesson strings από `reflection_logger.py recent --symbol X --limit 3`. Εξάγεις τα `lesson_one_liner` πεδία και κρατάς μόνο όσα είναι από τις τελευταίες 30 ημέρες. Empty array αν no recent trades. Αυτά εμφανίζονται ως 🧠 lines στα Tier cards του Monitor.
+- **`narrative_seed` (NEW v2)** — 1-2 sentence concrete thesis. Πρέπει να είναι forward prediction, όχι generic. Παραδείγματα: "Day 1 of post-FOMC weakness για SOL — έσπασε PDL 83.04, testing 83.00 ως resistance." Αν δεν έχεις thesis, γράψε "monitoring — no clear directional thesis yet".
+- **Schema validation**: αν `reasons[]` < 2 → score penalty −1 στο STEP 4 (όχι αρκετά justified). `recent_lessons[]` allowed empty. `narrative_seed` MANDATORY string.
 
 ---
 
@@ -291,6 +357,46 @@ python GOLD_TACTIC/scripts/dashboard_builder.py | python GOLD_TACTIC/scripts/tel
 
 ---
 
+## STEP 6.95 — Update Narrative Memory (v7.3 Shared Brain)
+
+Καταγράφεις τι έκανες σε αυτό το cycle ώστε ο επόμενος Monitor να ξέρει το context. Επειδή ο Selector κρατάει το `selector.lock`, χρησιμοποιείς **`--ignore-lock`** flag.
+
+```bash
+# 1. Append cycle entry στο brain
+python GOLD_TACTIC/scripts/narrative_writer.py append-cycle \
+  --schedule "Selector_<AM|PM|EVE|WE>" \
+  --trs-json '{}' \
+  --note "Picked X,Y,Z — primary reason..." \
+  --ignore-lock
+
+# 2. Per-asset narrative seed (καλείται για κάθε selected asset)
+# Επανέλαβε για κάθε ένα από τα 4 selected:
+python GOLD_TACTIC/scripts/narrative_writer.py update-narrative \
+  --asset <SYMBOL> \
+  --thread-append "<narrative_seed text — ίδιο που έγραψες στο selected_assets.json>" \
+  --schedule "Selector_<...>" \
+  --ignore-lock
+
+# 3. Log the selection message text (για anti-repetition του Monitor)
+python GOLD_TACTIC/scripts/narrative_writer.py log-message \
+  --level L0 \
+  --text-file GOLD_TACTIC/data/outgoing_msg.txt \
+  --summary "Selection card · top4: X,Y,Z,W · regime <label>" \
+  --asset-focus "X,Y,Z,W" \
+  --schedule "Selector_<...>" \
+  --ignore-lock
+```
+
+**EVE rotation extension:** Στο 21:00 EVE run, μετά το `selector-done`, καθάρισε expired hypotheses + παλιά cycles:
+
+```bash
+python GOLD_TACTIC/scripts/narrative_writer.py prune --schedule Selector_EVE --ignore-lock
+```
+
+**Fail-soft:** Αν narrative_writer αποτύχει σε κάποιο command → log to stderr και continue. **Μην μπλοκάρεις το cycle.** Brain degradation > zero brain. (Ο Monitor θα δουλέψει με ό,τι υπάρχει στο narrative_memory.)
+
+---
+
 ## STEP 6.9 — Coordination Done Signal (MANDATORY)
 
 **Στο τέλος κάθε Selector run** (μετά το dashboard refresh, πριν exit):
@@ -348,11 +454,14 @@ Format (HTML):
    ✅ TP: <code>{LEVEL}</code>   🛡️ SL: <code>{LEVEL}</code>
    🔔 Trigger: {WHAT_TO_WATCH}
    🧩 Strategy: {STRATEGY}
+   🧠 <i>{LESSON_LINE}</i>
+   🔮 <i>Thesis: {NARRATIVE_SEED}</i>
 
 2️⃣ <b>{SYMBOL}</b> {BIAS_EMOJI} <b>{DIRECTION}</b>  <i>(contingency)</i>
    Μόνο αν το primary δεν activateάρει.
    ⚠️ <i>Entry ισχύει ΜΟΝΟ μετά από {TRIGGER_SHORT}</i>
    🎯 Entry: <code>{LEVEL}</code>  ✅ TP: <code>{LEVEL}</code>  🛡️ SL: <code>{LEVEL}</code>
+   🧠 <i>{LESSON_LINE}</i>
 
 ━━━━━━━━━━━━━━━━━━━━━━
 ⏰ <b>Key times</b>
@@ -361,6 +470,11 @@ Format (HTML):
 
 🌡️ <b>Risk Meter:</b> {SCORE}/100 ({LABEL}) — <i>{SIZING_NOTE}</i>
 ```
+
+**Brain interpolation rules (v7.3):**
+- `{LESSON_LINE}` — από `selected[i].recent_lessons[0]` αν υπάρχει. Αν `recent_lessons` empty → **παράλειψε ολόκληρη τη γραμμή 🧠**, μην βάλεις placeholder.
+- `{NARRATIVE_SEED}` — από `selected[i].narrative_seed`. Πάντα present (mandatory). Αν είναι generic ("monitoring — no clear directional thesis yet") → ακόμα τη γράφεις, αλλά ο user βλέπει ότι δεν έχεις strong opinion ακόμα.
+- 🔮 emoji είναι μοναδικό για forward thesis — δεν χρησιμοποιείται αλλού.
 
 Sizing note:
 - Score ≤ 30: "Κανονικό μέγεθος OK"

@@ -32,6 +32,7 @@ data/processed/
 !GOLD_TACTIC/data/emergency_activations.json
 !GOLD_TACTIC/data/narrative_memory.json
 !GOLD_TACTIC/data/news_digest.json
+!GOLD_TACTIC/data/regime_state.json
 !GOLD_TACTIC/data/research_notes.md
 
 # GOLD_TACTIC — exclude generated/runtime/binary files

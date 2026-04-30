@@ -1,0 +1,40 @@
+{
+  "schema_version": "v1",
+  "last_updated": "2026-04-30T11:42:03+03:00",
+  "last_writer": "regime_detector.py force-reset",
+  "transitions_date": "2026-04-30",
+  "regime": {
+    "label": "calm",
+    "since_ts": "2026-04-30T11:42:03+03:00",
+    "age_hours": 0.0,
+    "conviction": "low",
+    "previous_label": null,
+    "transitions_today": 0
+  },
+  "vix": {
+    "value": null,
+    "tier": "normal",
+    "trend_4h": "flat"
+  },
+  "fear_greed": {
+    "value": null,
+    "label": "Neutral",
+    "delta_24h": null
+  },
+  "sentiment_dir": "mixed",
+  "dxy_state": {
+    "value": null,
+    "trend": null,
+    "key_break": null
+  },
+  "indicator_inputs": {
+    "adx_avg": 0.0,
+    "regimes_per_asset": {},
+    "alignment_count": {}
+  },
+  "session_tier": null,
+  "decay_rules": {
+    "reset_on_label_change": true,
+    "conviction_high_after_age_h": 24
+  }
+}
